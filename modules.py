@@ -184,14 +184,11 @@ class UNet(nn.Module):
         self.time_dim = time_dim
 
         self.channels = [64, 128, 256, 512, 1024]
-        self.middle_channels = [1024, 512]
+        # add True for attention layer
+        self.attn = [False, False, False, False]
 
         in_channel = c_in
         n_resolution = len(self.channels)
-
-        attn = [False]*(n_resolution-1)
-        up_isfinal = [False]*(n_resolution-2)
-        up_isfinal.append(True)
 
         # Down
         down = []
@@ -204,7 +201,7 @@ class UNet(nn.Module):
                 in_channel = out_channel
             out_channel = down_channels[i+1]
             down.append(Down(in_channel, out_channel,
-                        image_size//down_mul, has_attn=attn[i]))
+                        image_size//down_mul, has_attn=self.attn[i]))
             down_mul *= 2
             in_channel = out_channel
 
@@ -218,13 +215,14 @@ class UNet(nn.Module):
 
         # Up
         up = []
+        up_isfinal = [False, False, False, True]
         up_mul = down_mul//4
         up_channels = self.channels
         up_channels.reverse()
         for i in range(n_resolution-1):
             out_channel = up_channels[i+1]
             up.append(Up(in_channel, out_channel,
-                         image_size//up_mul, has_attn=attn[i], is_output=up_isfinal[i]))
+                         image_size//up_mul, has_attn=self.attn[i], is_output=up_isfinal[i]))
             up_mul //= 2
             in_channel = out_channel
 
@@ -268,17 +266,16 @@ class UNet(nn.Module):
 
 
 class UNet_conditional(nn.Module):
-    def __init__(self, c_in=1, c_out=1, time_dim=256, num_classes=None, image_size=224, device="cuda"):
+    def __init__(self, c_in=1, c_out=1, time_dim=256, num_classes=None, image_size=128, device="cuda"):
         super().__init__()
         self.device = device
         self.time_dim = time_dim
         self.channels = [64, 128, 256, 512, 1024]
+        # add True for attention layer
+        self.attn = [True, True, True, True]
 
         in_channel = c_in
         n_resolution = len(self.channels)
-        attn = [False]*(n_resolution-1)
-        up_isfinal = [False]*(n_resolution-2)
-        up_isfinal.append(True)
 
         # Down
         down = []
@@ -291,7 +288,7 @@ class UNet_conditional(nn.Module):
                 in_channel = out_channel
             out_channel = down_channels[i+1]
             down.append(Down(in_channel, out_channel,
-                        image_size//down_mul, has_attn=attn[i]))
+                        image_size//down_mul, has_attn=self.attn[i]))
             down_mul *= 2
             in_channel = out_channel
 
@@ -305,13 +302,14 @@ class UNet_conditional(nn.Module):
 
         # Up
         up = []
+        up_isfinal = [False, False, False, True]
         up_mul = down_mul//4
         up_channels = self.channels
         up_channels.reverse()
         for i in range(n_resolution-1):
             out_channel = up_channels[i+1]
             up.append(Up(in_channel, out_channel,
-                         image_size//up_mul, has_attn=attn[i], is_output=up_isfinal[i]))
+                         image_size//up_mul, has_attn=self.attn[i], is_output=up_isfinal[i]))
             up_mul //= 2
             in_channel = out_channel
 
@@ -355,20 +353,21 @@ class UNet_conditional(nn.Module):
             skip_x = h[idx+1]
             x = self.up[idx](x, skip_x, t)
 
-        # Last layer
+        # output layer
         out = self.up[-1](x)
 
         return out
 
 
 if __name__ == '__main__':
-    IMG_SIZE = 224
+    IMG_SIZE = 128
     # net = UNet(device="cpu", image_size=IMG_SIZE)
-    net = UNet_conditional(num_classes=10, image_size=128, device="cpu")
-    print(sum([p.numel() for p in net.parameters()]))
+    con_net = UNet_conditional(
+        num_classes=10, image_size=IMG_SIZE, device="cpu")
+    print(con_net.parameters)
+    print(sum([p.numel() for p in con_net.parameters()]))
     x = torch.randn(1, 1, IMG_SIZE, IMG_SIZE)
     t = x.new_tensor([500] * x.shape[0]).long()
     y = x.new_tensor([1] * x.shape[0]).long()
-    # print(net(x, t, y).shape)
-    print(net(x, t, y).shape)
-    print(net.parameters)
+    out = con_net(x, t, y)
+    print(out.shape)
