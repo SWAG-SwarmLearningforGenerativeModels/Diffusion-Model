@@ -1,4 +1,5 @@
 import os
+import math
 import copy
 import numpy as np
 import torch
@@ -15,12 +16,12 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s",
 
 
 class ConditionDiffusion:
-    def __init__(self, args, config, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=256):
-
+    def __init__(self, args, config, noise_steps=1000, schedule="cosine", beta_start=1e-4, beta_end=0.02, img_size=256):
         self.config = config
         self.args = args
         self.device = config.device
 
+        self.schedule = schedule
         self.noise_steps = noise_steps
         self.beta_start = beta_start
         self.beta_end = beta_end
@@ -31,8 +32,27 @@ class ConditionDiffusion:
 
         self.img_size = img_size
 
-    def prepare_noise_schedule(self):
-        return torch.linspace(self.beta_start, self.beta_end, self.noise_steps)
+    def prepare_noise_schedule(self, cosine_s=8e-3):
+        if self.schedule == "quad":
+            betas = (torch.linspace(self.beta_start ** 0.5, self.beta_end **
+                     0.5, self.noise_steps) ** 2)
+
+        elif self.schedule == "linear":
+            betas = torch.linspace(
+                self.beta_start, self.beta_end, self.noise_steps)
+
+        elif self.schedule == "cosine":
+            timesteps = (
+                torch.arange(self.noise_steps + 1) /
+                self.noise_steps + cosine_s
+            )
+            alphas = timesteps / (1 + cosine_s) * math.pi / 2
+            alphas = torch.cos(alphas).pow(2)
+            alphas = alphas / alphas[0]
+            betas = 1 - alphas[1:] / alphas[:-1]
+            betas = betas.clamp(max=0.999)
+
+        return betas
 
     def noise_images(self, x, t):
         sqrt_alpha_hat = torch.sqrt(self.alpha_hat[t])[:, None, None, None]

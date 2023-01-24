@@ -6,7 +6,7 @@ training:
   n_epochs: 1000
   snapshot_freq: 10
   snapshot_sampling: true
-  resume_training: true
+  resume_training: false
 
 sampling: 
   batch_size: 3

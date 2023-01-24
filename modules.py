@@ -132,7 +132,7 @@ class MiddleBlock(nn.Module):
 
 
 class Up(nn.Module):
-    def __init__(self, in_channels, out_channels, out_image_dim, num_groups=16, emb_dim=256, has_attn=False, is_output=False, is_upsample=False):
+    def __init__(self, in_channels, out_channels, out_image_dim, num_groups=32, emb_dim=256, has_attn=False, is_output=False, is_upsample=False):
         super().__init__()
 
         if is_upsample:
@@ -178,17 +178,18 @@ class Up(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, c_in=1, c_out=1, time_dim=256, image_size=224, device="cuda"):
+    def __init__(self, c_in=1, c_out=1, n_channels=[64, 128, 256, 512, 1024], time_dim=256, image_size=224, device="cuda"):
         super().__init__()
         self.device = device
         self.time_dim = time_dim
-
-        self.channels = [64, 128, 256, 512, 1024]
-        # add True for attention layer
-        self.attn = [False, False, False, False]
+        self.channels = n_channels
 
         in_channel = c_in
         n_resolution = len(self.channels)
+
+        attn = [False]*(n_resolution-1)  # True for attention layers
+        up_isfinal = [False]*(n_resolution-2)
+        up_isfinal.append(True)
 
         # Down
         down = []
@@ -201,7 +202,7 @@ class UNet(nn.Module):
                 in_channel = out_channel
             out_channel = down_channels[i+1]
             down.append(Down(in_channel, out_channel,
-                        image_size//down_mul, has_attn=self.attn[i]))
+                        image_size//down_mul, has_attn=attn[i]))
             down_mul *= 2
             in_channel = out_channel
 
@@ -215,14 +216,13 @@ class UNet(nn.Module):
 
         # Up
         up = []
-        up_isfinal = [False, False, False, True]
         up_mul = down_mul//4
         up_channels = self.channels
         up_channels.reverse()
         for i in range(n_resolution-1):
             out_channel = up_channels[i+1]
             up.append(Up(in_channel, out_channel,
-                         image_size//up_mul, has_attn=self.attn[i], is_output=up_isfinal[i]))
+                         image_size//up_mul, has_attn=attn[i], is_output=up_isfinal[i]))
             up_mul //= 2
             in_channel = out_channel
 
@@ -266,16 +266,17 @@ class UNet(nn.Module):
 
 
 class UNet_conditional(nn.Module):
-    def __init__(self, c_in=1, c_out=1, time_dim=256, num_classes=None, image_size=128, device="cuda"):
+    def __init__(self, c_in=1, c_out=1, n_channels=[64, 128, 256, 512, 1024], time_dim=256, num_classes=None, image_size=224, device="cuda"):
         super().__init__()
         self.device = device
         self.time_dim = time_dim
-        self.channels = [64, 128, 256, 512, 1024]
-        # add True for attention layer
-        self.attn = [False, False, False, False]
+        self.channels = n_channels
 
         in_channel = c_in
         n_resolution = len(self.channels)
+        attn = [False]*(n_resolution-1)  # True for attention layers
+        up_isfinal = [False]*(n_resolution-2)
+        up_isfinal.append(True)
 
         # Down
         down = []
@@ -288,7 +289,7 @@ class UNet_conditional(nn.Module):
                 in_channel = out_channel
             out_channel = down_channels[i+1]
             down.append(Down(in_channel, out_channel,
-                        image_size//down_mul, has_attn=self.attn[i]))
+                        image_size//down_mul, has_attn=attn[i]))
             down_mul *= 2
             in_channel = out_channel
 
@@ -302,14 +303,13 @@ class UNet_conditional(nn.Module):
 
         # Up
         up = []
-        up_isfinal = [False, False, False, True]
         up_mul = down_mul//4
         up_channels = self.channels
         up_channels.reverse()
         for i in range(n_resolution-1):
             out_channel = up_channels[i+1]
             up.append(Up(in_channel, out_channel,
-                         image_size//up_mul, has_attn=self.attn[i], is_output=up_isfinal[i]))
+                         image_size//up_mul, has_attn=attn[i], is_output=up_isfinal[i]))
             up_mul //= 2
             in_channel = out_channel
 
@@ -353,7 +353,7 @@ class UNet_conditional(nn.Module):
             skip_x = h[idx+1]
             x = self.up[idx](x, skip_x, t)
 
-        # output layer
+        # Last layer
         out = self.up[-1](x)
 
         return out
