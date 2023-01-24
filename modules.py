@@ -250,7 +250,7 @@ class UNet(nn.Module):
             x = m(x, t)
             h.append(x)
 
-        # Latent space
+        # Bottle Neck
         x = self.middle(x)
 
         # Decoder
@@ -259,7 +259,7 @@ class UNet(nn.Module):
             skip_x = h[idx+1]
             x = self.up[idx](x, skip_x, t)
 
-        # Last layer
+        # Ouput Layer
         out = self.up[-1](x)
 
         return out
@@ -344,7 +344,7 @@ class UNet_conditional(nn.Module):
             x = m(x, t)
             h.append(x)
 
-        # Latent space
+        # Bottle Neck
         x = self.middle(x)
 
         # Decoder
@@ -353,7 +353,7 @@ class UNet_conditional(nn.Module):
             skip_x = h[idx+1]
             x = self.up[idx](x, skip_x, t)
 
-        # Last layer
+        # Output Layer
         out = self.up[-1](x)
 
         return out
