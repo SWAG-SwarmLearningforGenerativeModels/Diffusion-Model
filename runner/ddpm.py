@@ -35,29 +35,24 @@ class UnconditionDiffusion:
 
     def prepare_noise_schedule(self, cosine_s=8e-3):
         if self.schedule == "quad":
-            betas = (
-                torch.linspace(self.beta_start ** 0.5, self.beta_end ** 0.5, self.noise_steps, dtype=torch.float64
-                               )
-                ** 2
-            )
+            beta_t = (torch.linspace(self.beta_start ** 0.5,
+                      self.beta_end ** 0.5, self.noise_steps) ** 2)
 
         elif self.schedule == "linear":
-            betas = torch.linspace(
-                self.beta_start, self.beta_end, self.noise_steps, dtype=torch.float64
-            )
+            beta_t = torch.linspace(
+                self.beta_start, self.beta_end, self.noise_steps)
 
         elif self.schedule == "cosine":
             timesteps = (
-                torch.arange(self.noise_steps + 1, dtype=torch.float64) /
-                self.noise_steps + cosine_s
+                torch.arange(self.noise_steps + 1)/self.noise_steps + cosine_s
             )
             alphas = timesteps / (1 + cosine_s) * math.pi / 2
             alphas = torch.cos(alphas).pow(2)
             alphas = alphas / alphas[0]
             betas = 1 - alphas[1:] / alphas[:-1]
-            betas = betas.clamp(max=0.999)
+            beta_t = betas.clamp(max=0.999)
 
-        return betas
+        return beta_t
 
     def noise_images(self, x, t):
         sqrt_alpha_hat = torch.sqrt(self.alpha_hat[t])[:, None, None, None]
