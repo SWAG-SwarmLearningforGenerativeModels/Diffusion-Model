@@ -1,0 +1,33 @@
+
+device: "cuda"
+
+training:
+  batch_size: 8
+  n_epochs: 1000
+  snapshot_freq: 10
+  snapshot_sampling: true
+  resume_training: true
+
+sampling: 
+  batch_size: 3
+  data_init: false
+
+data:
+  dataset: "brain"
+  image_size: 224
+  num_classes: 4
+  train_path: "/home/domainHomes/aokolie/Desktop/Augustine Workspace/SWAG PROJECT/Diffusion models/diffussion_utils/brain/Training"
+  test_path: "/home/domainHomes/aokolie/Desktop/Augustine Workspace/SWAG PROJECT/Diffusion models/diffussion_utils/brain/Testing"
+  channels: 1
+  rescaled: false
+  random_flip: false
+  num_workers: 4
+
+optim:
+  weight_decay: 0.01
+  optimizer: "AdamW"
+  lr: 0.0001
+  beta1: 0.9
+  beta2: 0.999
+  amsgrad: false
+  eps: 0.00000001
