@@ -1,0 +1,32 @@
+
+device: cuda
+
+training:
+  batch_size: 4
+  n_epochs: 1000
+  snapshot_freq: 5
+  snapshot_sampling: true
+  resume_training: true
+
+sampling: 
+  batch_size: 4
+  data_init: false
+
+data:
+  dataset: xray
+  image_size: 224
+  num_classes: 0
+  train_path: /home/domainHomes/aokolie/Desktop/Augustine Workspace/SWAG PROJECT/datasets/X-Rays/datasets/CXR14/CXR14/files/images_007
+  channels: 1
+  rescaled: false
+  random_flip: false
+  num_workers: 4
+
+optim:
+  weight_decay: 0.01
+  optimizer: AdamW
+  lr: 0.0001
+  beta1: 0.9
+  beta2: 0.999
+  amsgrad: false
+  eps: 0.00000001

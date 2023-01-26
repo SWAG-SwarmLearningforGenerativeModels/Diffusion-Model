@@ -20,7 +20,7 @@ def get_data(config):
         ])
 
         dataset = torchvision.datasets.ImageFolder(
-            config.data.image_path, transform=transforms)
+            config.data.train_path, transform=transforms)
 
         print(f'Length of training dataset: {len(dataset)}')
 
@@ -35,10 +35,10 @@ def get_data(config):
             torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
 
-        trainset = torchvision.datasets.CIFAR10(root=config.data.image_path, train=True,
+        trainset = torchvision.datasets.CIFAR10(root=config.data.train_path, train=True,
                                                 download=True, transform=transform)
 
-        testset = torchvision.datasets.CIFAR10(root=config.data.image_path, train=False,
+        testset = torchvision.datasets.CIFAR10(root=config.data.train_path, train=False,
                                                download=True, transform=transform)
 
         c_dataset = torch.utils.data.ConcatDataset(
@@ -73,6 +73,24 @@ def get_data(config):
         print(f'Length of training dataset: {len(c_dataset)}')
         dataloader = DataLoader(
             c_dataset, batch_size=config.training.batch_size, num_workers=config.data.num_workers, shuffle=True)
+
+        return dataloader
+
+    elif config.data.dataset == 'xray':
+
+        transforms = torchvision.transforms.Compose([
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Grayscale(1),
+            torchvision.transforms.Resize(
+                (config.data.image_size, config.data.image_size)),
+            torchvision.transforms.Normalize((0.5, ), (0.5, ))
+        ])
+        train_dataset = torchvision.datasets.ImageFolder(
+            config.data.train_path, transform=transforms)
+
+        print(f'Length of training dataset: {len(train_dataset)}')
+        dataloader = DataLoader(
+            train_dataset, batch_size=config.training.batch_size, num_workers=config.data.num_workers, shuffle=True)
 
         return dataloader
 

@@ -1,15 +1,15 @@
 import os
 import copy
-import numpy as np
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-from torch import optim
-from utils import *
+from utils import (gather, get_model, get_optimizer,
+                   save_images, inverse_transform)
 from dataloaders import *
-from modules import UNet, EMA
+from unet.modules import EMA
 import math
 import logging
+import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s",
@@ -17,9 +17,10 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s",
 
 
 class UnconditionDiffusion:
-    def __init__(self, args, config, noise_steps=1000, schedule="cosine", beta_start=1e-4, beta_end=0.02, img_size=256):
+    def __init__(self, args, config, model_config, noise_steps=1000, schedule="linear", beta_start=1e-4, beta_end=0.02, img_size=256):
 
         self.config = config
+        self.model_config = model_config
         self.args = args
         self.device = config.device
 
@@ -32,6 +33,7 @@ class UnconditionDiffusion:
         self.alpha_hat = torch.cumprod(self.alpha, dim=0)
 
         self.img_size = img_size
+        self.mse_loss = nn.MSELoss()
 
     def prepare_noise_schedule(self, cosine_s=8e-3):
         if self.schedule == "quad":
@@ -54,55 +56,88 @@ class UnconditionDiffusion:
 
         return beta_t
 
-    def noise_images(self, x, t):
-        sqrt_alpha_hat = torch.sqrt(self.alpha_hat[t])[:, None, None, None]
-        sqrt_one_minus_alpha_hat = torch.sqrt(
-            1 - self.alpha_hat[t])[:, None, None, None]
-        Ɛ = torch.randn_like(x)
-        return sqrt_alpha_hat * x + sqrt_one_minus_alpha_hat * Ɛ, Ɛ
-
     def sample_timesteps(self, n):
         return torch.randint(low=1, high=self.noise_steps, size=(n,))
+
+    def q_xt_x0(self, x0, t):
+        mean = gather(self.alpha_hat, t) ** 0.5 * x0
+        var = 1 - gather(self.alpha_hat, t)
+
+        # return mean and variance of image at time t
+        return mean, var
+
+    def q_sample(self, x0, t, eps):
+
+        if eps is None:
+            eps = torch.randn_like(x0)
+
+        mean, var = self.q_xt_x0(x0, t)
+
+        # noise image and return noised image
+        return mean + (var ** 0.5) * eps
+
+    def p_sample(self, eps_model, xt, t, eps):
+        eps_theta = eps_model(xt, t)
+        alpha_hat = gather(self.alpha_hat, t)
+        alpha = gather(self.alpha, t)
+        eps_coef = (1 - alpha) / (1 - alpha_hat) ** .5
+        mean = 1 / (alpha ** 0.5) * (xt - eps_coef * eps_theta)
+        var = gather(self.beta, t)
+
+        return mean + (var ** .5) * eps
+
+    def loss(self, eps_model, x0, noise=None):
+
+        batch_size = x0.shape[0]
+        t = self.sample_timesteps(batch_size).to(self.device)
+
+        if noise is None:
+            noise = torch.randn_like(x0)
+
+        xt = self.q_sample(x0, t, eps=noise)
+        eps_theta = eps_model(xt, t)
+
+        # MSE loss
+        return self.mse_loss(noise, eps_theta)
 
     def sample(self, model, n):
         logging.info(f"Sampling {n} new images....")
         model.eval()
         with torch.no_grad():
-            x = torch.randn(
-                (n, self.config.data.channels, self.img_size, self.img_size)).to(self.device)
+            x = torch.randn((n, self.config.data.channels,
+                            self.img_size, self.img_size)).to(self.device)
             for i in tqdm(reversed(range(1, self.noise_steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
-                predicted_noise = model(x, t)
-                alpha = self.alpha[t][:, None, None, None]
-                alpha_hat = self.alpha_hat[t][:, None, None, None]
-                beta = self.beta[t][:, None, None, None]
                 if i > 1:
-                    noise = torch.randn_like(x)
+                    eps = torch.randn_like(x, device=x.device)
                 else:
-                    noise = torch.zeros_like(x)
-                x = 1 / torch.sqrt(alpha) * (x - ((1 - alpha) / (torch.sqrt(1 - alpha_hat)))
-                                             * predicted_noise) + torch.sqrt(beta) * noise
+                    eps = torch.zeros_like(x, device=x.device)
+
+                x = self.p_sample(eps_model=model, xt=x, t=t, eps=eps)
+
         model.train()
         x = inverse_transform(x)
         return x
 
     def train(self):
-        device = self.device
-        dataloader = get_data(self.config)
-        model = UNet(c_in=self.config.data.channels, c_out=self.config.data.channels,
-                     image_size=self.config.data.image_size).to(self.device)
+        dataloader = get_data(config=self.config)
+        model = get_model(args=self.args, config=self.config,
+                          model_config=self.model_config)
+
+        model.to(self.device)
         print(model.parameters)
+
         ema = EMA(0.995)
         ema_model = copy.deepcopy(model).eval().requires_grad_(False)
 
         optimizer = get_optimizer(self.config, model.parameters())
-        mse = nn.MSELoss()
+
         logger = SummaryWriter(self.config.logger)
         l = len(dataloader)
 
         start_epoch = 0
 
-        if self.config.training.resume_training:
+        if self.args.resume_training:
             # load it
             states = torch.load(os.path.join(
                 self.args.log_path, "models", 'ckpt_states.pt'))
@@ -118,12 +153,9 @@ class UnconditionDiffusion:
             pbar = tqdm(dataloader)
             for i, (images, _) in enumerate(pbar):
                 images = images.to(self.device)
+                noise = torch.randn_like(images)
 
-                t = self.sample_timesteps(images.shape[0]).to(self.device)
-                x_t, noise = self.noise_images(images, t)
-
-                predicted_noise = model(x_t, t)
-                loss = mse(noise, predicted_noise)
+                loss = self.loss(eps_model=model, x0=images, noise=noise)
 
                 optimizer.zero_grad()
                 loss.backward()

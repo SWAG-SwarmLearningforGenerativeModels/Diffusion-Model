@@ -10,7 +10,7 @@ sampling:
   data_init: false
 
 data:
-  image_path: "cifar10_data"
+  train_path: "cifar10_data"
   dataset: "cifar10"
   image_size: 32
   num_classes: 10

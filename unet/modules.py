@@ -177,7 +177,7 @@ class Up(nn.Module):
         return self.down_conv(self.attn_layer(x))
 
 
-class UNet(nn.Module):
+class UNetUnconditionalDeep(nn.Module):
     def __init__(self, c_in=1, c_out=1, n_channels=[64, 128, 256, 512, 1024], time_dim=256, image_size=224, device="cuda"):
         super().__init__()
         self.device = device
@@ -250,7 +250,7 @@ class UNet(nn.Module):
             x = m(x, t)
             h.append(x)
 
-        # Bottle Neck
+        # Latent space
         x = self.middle(x)
 
         # Decoder
@@ -259,13 +259,13 @@ class UNet(nn.Module):
             skip_x = h[idx+1]
             x = self.up[idx](x, skip_x, t)
 
-        # Ouput Layer
+        # Last layer
         out = self.up[-1](x)
 
         return out
 
 
-class UNet_conditional(nn.Module):
+class UNetConditionalDeep(nn.Module):
     def __init__(self, c_in=1, c_out=1, n_channels=[64, 128, 256, 512, 1024], time_dim=256, num_classes=None, image_size=224, device="cuda"):
         super().__init__()
         self.device = device
@@ -344,7 +344,7 @@ class UNet_conditional(nn.Module):
             x = m(x, t)
             h.append(x)
 
-        # Bottle Neck
+        # Latent space
         x = self.middle(x)
 
         # Decoder
@@ -353,7 +353,20 @@ class UNet_conditional(nn.Module):
             skip_x = h[idx+1]
             x = self.up[idx](x, skip_x, t)
 
-        # Output Layer
+        # Last layer
         out = self.up[-1](x)
 
         return out
+
+# if __name__ == '__main__':
+#     IMG_SIZE = 128
+#     # net = UNet(device="cpu", image_size=IMG_SIZE)
+#     con_net = UNet_conditional(
+#         num_classes=10, image_size=IMG_SIZE, device="cpu")
+#     print(con_net.parameters)
+#     print(sum([p.numel() for p in con_net.parameters()]))
+#     x = torch.randn(1, 1, IMG_SIZE, IMG_SIZE)
+#     t = x.new_tensor([500] * x.shape[0]).long()
+#     y = x.new_tensor([1] * x.shape[0]).long()
+#     out = con_net(x, t, y)
+#     print(out.shape)

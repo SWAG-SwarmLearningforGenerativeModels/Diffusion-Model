@@ -29,14 +29,22 @@ def parse_args_and_config():
                         help='Whether to produce samples from the model')
     parser.add_argument('--conditional', default=True,
                         help='Whether to train a conditional or unconditional model')
+    parser.add_argument('--resume_training', default=False,
+                        help='Whether to resume training')
 
     args = parser.parse_args()
     args.log_path = os.path.join(args.exp, 'logs', args.doc)
 
     # parse config file
+    # Data config
     with open(os.path.join('configs', args.config), 'r') as f:
         config = yaml.safe_load(f)
+    # Model Config
+    with open(os.path.join('configs', 'model.yml'), 'r') as f:
+        mod_config = yaml.safe_load(f)
+
     new_config = dict2namespace(config)
+    mode_config = dict2namespace(mod_config)
 
     tb_path = os.path.join(args.exp, 'tensorboard', args.doc)
 
@@ -64,7 +72,7 @@ def parse_args_and_config():
 
     torch.backends.cudnn.benchmark = True
 
-    return args, new_config
+    return args, new_config, mode_config
 
 
 def dict2namespace(config):
@@ -79,7 +87,7 @@ def dict2namespace(config):
 
 
 def main():
-    args, config = parse_args_and_config()
+    args, config, model_config = parse_args_and_config()
     logging.info("Writing log file to {}".format(args.log_path))
     logging.info("Exp instance id = {}".format(os.getpid()))
     logging.info("Config =")
@@ -92,11 +100,11 @@ def main():
         print("Initializing Model ... ")
         if args.conditional:
             print("Loading Conditional Model ... ")
-            cond_runner = ConditionDiffusion(args, config)
+            cond_runner = ConditionDiffusion(args, config, model_config)
             cond_runner.train()
         else:
             print("Loading Unconditional Model ... ")
-            uncond_runner = UnconditionDiffusion(args, config)
+            uncond_runner = UnconditionDiffusion(args, config, model_config)
             uncond_runner.train()
 
     except:

@@ -10,7 +10,7 @@ sampling:
   data_init: false
 
 data:
-  image_path: "/path/to/data/folder"
+  train_path: "/path/to/data/folder"
   dataset: "landscape"
   image_size: 128
   num_classes: 10
