@@ -357,16 +357,3 @@ class UNetConditionalDeep(nn.Module):
         out = self.up[-1](x)
 
         return out
-
-# if __name__ == '__main__':
-#     IMG_SIZE = 128
-#     # net = UNet(device="cpu", image_size=IMG_SIZE)
-#     con_net = UNet_conditional(
-#         num_classes=10, image_size=IMG_SIZE, device="cpu")
-#     print(con_net.parameters)
-#     print(sum([p.numel() for p in con_net.parameters()]))
-#     x = torch.randn(1, 1, IMG_SIZE, IMG_SIZE)
-#     t = x.new_tensor([500] * x.shape[0]).long()
-#     y = x.new_tensor([1] * x.shape[0]).long()
-#     out = con_net(x, t, y)
-#     print(out.shape)
