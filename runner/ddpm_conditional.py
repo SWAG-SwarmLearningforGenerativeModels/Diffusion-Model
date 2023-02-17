@@ -109,7 +109,6 @@ class ConditionDiffusion:
 
     def sample(self, model, n, labels):
         logging.info(f"Sampling {n} new images....")
-        model.eval()
         with torch.no_grad():
             x = torch.randn((n, self.config.data.channels,
                             self.img_size, self.img_size)).to(self.device)
@@ -123,7 +122,6 @@ class ConditionDiffusion:
                 x = self.p_sample(eps_model=model, xt=x,
                                   t=time, y=labels, eps=eps)
 
-        model.train()
         x = inverse_transform(x)
         return x
 
@@ -157,6 +155,7 @@ class ConditionDiffusion:
             print('Pretrained model loaded successfully')
 
         for epoch in range(start_epoch, self.config.training.n_epochs):
+            model.train()
             logging.info(f"Starting epoch {epoch}:")
             pbar = tqdm(dataloader)
             for i, (images, labels) in enumerate(pbar):
@@ -178,31 +177,33 @@ class ConditionDiffusion:
                                   global_step=epoch * l + i)
 
             if epoch % self.config.training.snapshot_freq == 0:
-                states = [
-                    model.state_dict(),
-                    ema_model.state_dict(),
-                    optimizer.state_dict(),
-                    epoch
-                ]
+                model.eval()
+                with torch.no_grad():
+                    states = [
+                        model.state_dict(),
+                        ema_model.state_dict(),
+                        optimizer.state_dict(),
+                        epoch
+                    ]
 
-                if self.config.training.snapshot_sampling:
-                    labels = torch.arange(self.config.data.num_classes).repeat(
-                        1, self.config.sampling.batch_size).squeeze().long().to(self.device)
-                    sampled_images = self.sample(
-                        model, n=len(labels), labels=labels)
-                    ema_sampled_images = self.sample(
-                        ema_model, n=len(labels), labels=labels)
+                    if self.config.training.snapshot_sampling:
+                        labels = torch.arange(self.config.data.num_classes).repeat(
+                            1, self.config.sampling.batch_size).squeeze().long().to(self.device)
+                        sampled_images = self.sample(
+                            model, n=len(labels), labels=labels)
+                        ema_sampled_images = self.sample(
+                            ema_model, n=len(labels), labels=labels)
 
-                    save_images(sampled_images, os.path.join(
-                        self.args.log_path, 'results', f"{epoch}.jpg"), nrow=self.config.data.num_classes)
-                    save_images(ema_sampled_images, os.path.join(
-                        self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=self.config.data.num_classes)
+                        save_images(sampled_images, os.path.join(
+                            self.args.log_path, 'results', f"{epoch}.jpg"), nrow=self.config.data.num_classes)
+                        save_images(ema_sampled_images, os.path.join(
+                            self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=self.config.data.num_classes)
 
-                torch.save(states, os.path.join(self.args.log_path,
-                           'models', 'ckpt_states.pt'.format(epoch)))
+                    torch.save(states, os.path.join(self.args.log_path,
+                                                    'models', 'ckpt_states.pt'.format(epoch)))
 
-                torch.save(model, os.path.join(self.args.log_path,
-                           'models', 'ckpt_model_{}.pt'.format(epoch)))
+                    torch.save(model, os.path.join(self.args.log_path,
+                                                   'models', 'ckpt_model_{}.pt'.format(epoch)))
 
-                torch.save(ema_model, os.path.join(self.args.log_path,
-                           'models', 'ckpt_ema_model_{}.pt'.format(epoch)))
+                    torch.save(ema_model, os.path.join(self.args.log_path,
+                                                       'models', 'ckpt_ema_model_{}.pt'.format(epoch)))

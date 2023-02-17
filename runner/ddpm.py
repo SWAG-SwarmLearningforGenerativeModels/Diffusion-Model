@@ -102,7 +102,7 @@ class UnconditionDiffusion:
 
     def sample(self, model, n):
         logging.info(f"Sampling {n} new images....")
-        model.eval()
+
         with torch.no_grad():
             x = torch.randn((n, self.config.data.channels,
                             self.img_size, self.img_size)).to(self.device)
@@ -115,8 +115,8 @@ class UnconditionDiffusion:
 
                 x = self.p_sample(eps_model=model, xt=x, t=t, eps=eps)
 
-        model.train()
         x = inverse_transform(x)
+
         return x
 
     def train(self):
@@ -149,6 +149,7 @@ class UnconditionDiffusion:
             print('Pretrained model loaded successfully')
 
         for epoch in range(start_epoch, self.config.training.n_epochs):
+            model.train()
             logging.info(f"Starting epoch {epoch}:")
             pbar = tqdm(dataloader)
             for i, (images, _) in enumerate(pbar):
@@ -167,29 +168,31 @@ class UnconditionDiffusion:
                                   global_step=epoch * l + i)
 
             if epoch % self.config.training.snapshot_freq == 0:
-                states = [
-                    model.state_dict(),
-                    ema_model.state_dict(),
-                    optimizer.state_dict(),
-                    epoch
-                ]
+                model.eval()
+                with torch.no_grad():
+                    states = [
+                        model.state_dict(),
+                        ema_model.state_dict(),
+                        optimizer.state_dict(),
+                        epoch
+                    ]
 
-                if self.config.training.snapshot_sampling:
-                    sampled_images = self.sample(
-                        model, n=self.config.sampling.batch_size)
-                    ema_sampled_images = self.sample(
-                        ema_model, n=self.config.sampling.batch_size)
+                    if self.config.training.snapshot_sampling:
+                        sampled_images = self.sample(
+                            model, n=self.config.sampling.batch_size)
+                        ema_sampled_images = self.sample(
+                            ema_model, n=self.config.sampling.batch_size)
 
-                    save_images(sampled_images, os.path.join(
-                        self.args.log_path, 'results', f"{epoch}.jpg"), nrow=math.ceil(math.sqrt(self.config.sampling.batch_size)))
-                    save_images(ema_sampled_images, os.path.join(
-                        self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=math.ceil(math.sqrt(self.config.sampling.batch_size)))
+                        save_images(sampled_images, os.path.join(
+                            self.args.log_path, 'results', f"{epoch}.jpg"), nrow=math.ceil(math.sqrt(self.config.sampling.batch_size)))
+                        save_images(ema_sampled_images, os.path.join(
+                            self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=math.ceil(math.sqrt(self.config.sampling.batch_size)))
 
-                torch.save(states, os.path.join(self.args.log_path,
-                           'models', 'ckpt_states.pt'.format(epoch)))
+                    torch.save(states, os.path.join(self.args.log_path,
+                                                    'models', 'ckpt_states.pt'.format(epoch)))
 
-                torch.save(model, os.path.join(self.args.log_path,
-                           'models', 'ckpt_model_{}.pt'.format(epoch)))
+                    torch.save(model, os.path.join(self.args.log_path,
+                                                   'models', 'ckpt_model_{}.pt'.format(epoch)))
 
-                torch.save(ema_model, os.path.join(self.args.log_path,
-                           'models', 'ckpt_ema_model_{}.pt'.format(epoch)))
+                    torch.save(ema_model, os.path.join(self.args.log_path,
+                                                       'models', 'ckpt_ema_model_{}.pt'.format(epoch)))
