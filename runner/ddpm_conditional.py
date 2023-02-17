@@ -4,13 +4,16 @@ import copy
 import numpy as np
 import torch
 import torch.nn as nn
-from utils import (gather, get_model, get_optimizer,
-                   save_images, inverse_transform)
-from dataloaders import *
-from unet.modules import EMA
+from torchvision.utils import save_image
+from torch.utils.tensorboard import SummaryWriter
+
 import logging
 from tqdm import tqdm
-from torch.utils.tensorboard import SummaryWriter
+
+from utils import (gather, get_model, get_optimizer, inverse_transform)
+from dataloaders import *
+from unet.modules import EMA
+
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s",
                     level=logging.INFO, datefmt="%I:%M:%S")
@@ -194,10 +197,10 @@ class ConditionDiffusion:
                         ema_sampled_images = self.sample(
                             ema_model, n=len(labels), labels=labels)
 
-                        save_images(sampled_images, os.path.join(
-                            self.args.log_path, 'results', f"{epoch}.jpg"), nrow=self.config.data.num_classes)
-                        save_images(ema_sampled_images, os.path.join(
-                            self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=self.config.data.num_classes)
+                        save_image(sampled_images, os.path.join(
+                            self.args.log_path, 'results', f"{epoch}.jpg"), nrow=self.config.data.num.classes)
+                        save_image(ema_sampled_images, os.path.join(
+                            self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=self.config.data.num.classes)
 
                     torch.save(states, os.path.join(self.args.log_path,
                                                     'models', 'ckpt_states.pt'.format(epoch)))

@@ -3,14 +3,16 @@ import copy
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-from utils import (gather, get_model, get_optimizer,
-                   save_images, inverse_transform)
-from dataloaders import *
-from unet.modules import EMA
-import math
-import logging
+from torchvision.utils import save_image
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
+
+import math
+import logging
+
+from unet.modules import EMA
+from utils import (gather, get_model, get_optimizer, inverse_transform)
+from dataloaders import *
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s",
                     level=logging.INFO, datefmt="%I:%M:%S")
@@ -183,10 +185,10 @@ class UnconditionDiffusion:
                         ema_sampled_images = self.sample(
                             ema_model, n=self.config.sampling.batch_size)
 
-                        save_images(sampled_images, os.path.join(
-                            self.args.log_path, 'results', f"{epoch}.jpg"), nrow=math.ceil(math.sqrt(self.config.sampling.batch_size)))
-                        save_images(ema_sampled_images, os.path.join(
-                            self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=math.ceil(math.sqrt(self.config.sampling.batch_size)))
+                        save_image(sampled_images, os.path.join(
+                            self.args.log_path, 'results', f"{epoch}.jpg"), nrow=int(sampled_images.shape[0]**0.5))
+                        save_image(ema_sampled_images, os.path.join(
+                            self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=int(ema_sampled_images.shape[0]**0.5))
 
                     torch.save(states, os.path.join(self.args.log_path,
                                                     'models', 'ckpt_states.pt'.format(epoch)))

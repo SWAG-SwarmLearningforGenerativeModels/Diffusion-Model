@@ -83,10 +83,7 @@ def plot_images(images):
 
 
 def save_images(images, path, **kwargs):
-    grid = torchvision.utils.make_grid(images, kwargs['nrow'])
-    ndarr = grid.permute(1, 2, 0).to('cpu').numpy()
-    im = Image.fromarray(ndarr)
-    im.save(path)
+    torch.save(images, path, nrow=int(images.shape[0]**0.5))
 
 
 def inverse_transform(inp_tensor):
