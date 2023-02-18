@@ -15,7 +15,7 @@ sampling:
 data:
   dataset: xray
   image_size: 224
-  num_classes: 0
+  num_classes: 1
   train_path: /home/domainHomes/aokolie/Desktop/Augustine Workspace/SWAG PROJECT/datasets/X-Rays/datasets/CXR14/CXR14/files/images_007
   channels: 1
   rescaled: false

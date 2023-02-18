@@ -579,3 +579,35 @@ class UNetConditionalDeeper(nn.Module):
         out = spatial_unfold(out, self.fold)
 
         return out
+
+
+if __name__ == '__main__':
+    IMG_SIZE = 128
+    # net = UNet(in_channel=1,
+    #            out_channel=1,
+    #            channel=128,
+    #            channel_multiplier=[1, 1, 2, 2, 4, 4],
+    #            n_res_blocks=2,
+    #            attn_strides=[16],
+    #            attn_heads=1,
+    #            use_affine_time=False,
+    #            dropout=0.0,
+    #            fold=1)
+    net = UNetConditionalDeeper(in_channel=1,
+                                num_classes=4,
+                                out_channel=1,
+                                channel=128,
+                                channel_multiplier=[1, 1, 2, 2, 4, 4],
+                                n_res_blocks=2,
+                                attn_strides=[16],
+                                attn_heads=1,
+                                use_affine_time=False,
+                                dropout=0.0,
+                                fold=1)
+    print(sum([p.numel() for p in net.parameters()]))
+    x = torch.randn(1, 1, IMG_SIZE, IMG_SIZE)
+    t = x.new_tensor([500] * x.shape[0]).long()
+    y = x.new_tensor([1] * x.shape[0]).long()
+    out = net(x, t, y)
+    print(out.shape)
+    print(net.parameters)

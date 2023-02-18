@@ -2,9 +2,6 @@ from matplotlib import pyplot as plt
 from PIL import Image
 import torchvision
 import torch
-import torch.optim as optim
-from unet.modules import UNetUnconditionalDeep, UNetConditionalDeep
-from unet.modules2 import UNetUnconditionalDeeper, UNetConditionalDeeper
 import torch.utils.data
 
 
@@ -12,66 +9,6 @@ def gather(consts: torch.Tensor, t: torch.Tensor):
     """Gather consts for $t$ and reshape to feature map shape"""
     c = consts.gather(-1, t)
     return c.reshape(-1, 1, 1, 1)
-
-
-def get_model(args, config, model_config):
-
-    if args.conditional:
-        if config.data.image_size < 192:
-            model = UNetConditionalDeep(c_in=config.data.channels, c_out=config.data.channels,
-                                        num_classes=config.data.num_classes, image_size=config.data.image_size)
-        else:
-            model = UNetConditionalDeeper(in_channel=config.data.channels,
-                                          out_channel=config.data.channels,
-                                          num_classes=config.data.num_classes,
-                                          channel=model_config.model.channel,
-                                          channel_multiplier=model_config.model.channel_multiplier,
-                                          n_res_blocks=model_config.model.n_res_blocks,
-                                          attn_strides=model_config.model.attn_strides,
-                                          attn_heads=model_config.model.attn_heads,
-                                          use_affine_time=model_config.model.use_affine_time,
-                                          dropout=model_config.model.dropout,
-                                          fold=model_config.model.fold
-                                          )
-
-    else:
-        if config.data.image_size < 192:
-            model = UNetUnconditionalDeep(c_in=config.data.channels, c_out=config.data.channels,
-                                          image_size=config.data.image_size)
-        else:
-            model = UNetUnconditionalDeeper(in_channel=config.data.channels,
-                                            out_channel=config.data.channels,
-                                            channel=model_config.model.channel,
-                                            channel_multiplier=model_config.model.channel_multiplier,
-                                            n_res_blocks=model_config.model.n_res_blocks,
-                                            attn_strides=model_config.model.attn_strides,
-                                            attn_heads=model_config.model.attn_heads,
-                                            use_affine_time=model_config.model.use_affine_time,
-                                            dropout=model_config.model.dropout,
-                                            fold=model_config.model.fold
-                                            )
-
-    return model
-
-
-def get_optimizer(config, parameters):
-    if config.optim.optimizer == 'Adam':
-        return optim.Adam(parameters, lr=config.optim.lr, weight_decay=config.optim.weight_decay,
-                          betas=(
-                              config.optim.beta1, config.optim.beta2), amsgrad=config.optim.amsgrad,
-                          eps=config.optim.eps)
-    if config.optim.optimizer == 'AdamW':
-        return optim.AdamW(parameters, lr=config.optim.lr, weight_decay=config.optim.weight_decay,
-                           betas=(
-                               config.optim.beta1, config.optim.beta2), amsgrad=config.optim.amsgrad,
-                           eps=config.optim.eps)
-    elif config.optim.optimizer == 'RMSProp':
-        return optim.RMSprop(parameters, lr=config.optim.lr, weight_decay=config.optim.weight_decay)
-    elif config.optim.optimizer == 'SGD':
-        return optim.SGD(parameters, lr=config.optim.lr, momentum=0.9)
-    else:
-        raise NotImplementedError(
-            'Optimizer {} not understood.'.format(config.optim.optimizer))
 
 
 def plot_images(images):
@@ -83,7 +20,10 @@ def plot_images(images):
 
 
 def save_images(images, path, **kwargs):
-    torch.save(images, path, nrow=int(images.shape[0]**0.5))
+    grid = torchvision.utils.make_grid(images, kwargs['nrow'])
+    ndarr = grid.permute(1, 2, 0).to('cpu').numpy()
+    im = Image.fromarray(ndarr)
+    im.save(path)
 
 
 def inverse_transform(inp_tensor):

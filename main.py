@@ -27,7 +27,7 @@ def parse_args_and_config():
                         'Will be the name of the log folder.')
     parser.add_argument('--sample', action='store_true',
                         help='Whether to produce samples from the model')
-    parser.add_argument('--conditional', default=True,
+    parser.add_argument('--conditional', default=False,
                         help='Whether to train a conditional or unconditional model')
     parser.add_argument('--resume_training', default=False,
                         help='Whether to resume training')

@@ -10,9 +10,10 @@ from torch.utils.tensorboard import SummaryWriter
 import logging
 from tqdm import tqdm
 
-from utils import (gather, get_model, get_optimizer, inverse_transform)
+from utils import gather, inverse_transform
 from dataloaders import *
 from unet.modules import EMA
+from unet import get_model, get_optimizer
 
 
 logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s",
