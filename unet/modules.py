@@ -1,7 +1,14 @@
+import math
+from typing import List
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
+from torch.nn import functional as F
+from pydantic import StrictInt, StrictFloat, StrictBool
+
+
+# def swish(input):
+#     return input * torch.sigmoid(input)
 
 
 class EMA:
@@ -32,341 +39,543 @@ class EMA:
         ema_model.load_state_dict(model.state_dict())
 
 
+swish = F.silu
+
+
+@torch.no_grad()
+def variance_scaling_init_(tensor, scale=1, mode="fan_avg", distribution="uniform"):
+    fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(tensor)
+
+    if mode == "fan_in":
+        scale /= fan_in
+
+    elif mode == "fan_out":
+        scale /= fan_out
+
+    else:
+        scale /= (fan_in + fan_out) / 2
+
+    if distribution == "normal":
+        std = math.sqrt(scale)
+
+        return tensor.normal_(0, std)
+
+    else:
+        bound = math.sqrt(3 * scale)
+
+        return tensor.uniform_(-bound, bound)
+
+
+def conv2d(
+    in_channel,
+    out_channel,
+    kernel_size,
+    stride=1,
+    padding=0,
+    bias=True,
+    scale=1,
+    mode="fan_avg",
+):
+    conv = nn.Conv2d(
+        in_channel, out_channel, kernel_size, stride=stride, padding=padding, bias=bias
+    )
+
+    variance_scaling_init_(conv.weight, scale, mode=mode)
+
+    if bias:
+        nn.init.zeros_(conv.bias)
+
+    return conv
+
+
+def linear(in_channel, out_channel, scale=1, mode="fan_avg"):
+    lin = nn.Linear(in_channel, out_channel)
+
+    variance_scaling_init_(lin.weight, scale, mode=mode)
+    nn.init.zeros_(lin.bias)
+
+    return lin
+
+
+class Swish(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input):
+        return swish(input)
+
+
+class Upsample(nn.Sequential):
+    def __init__(self, channel):
+        layers = [
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            conv2d(channel, channel, 3, padding=1),
+        ]
+
+        super().__init__(*layers)
+
+
+class Downsample(nn.Sequential):
+    def __init__(self, channel):
+        layers = [conv2d(channel, channel, 3, stride=2, padding=1)]
+
+        super().__init__(*layers)
+
+
+class ResBlock(nn.Module):
+    def __init__(
+        self, in_channel, out_channel, time_dim, use_affine_time=False, dropout=0
+    ):
+        super().__init__()
+
+        self.use_affine_time = use_affine_time
+        time_out_dim = out_channel
+        time_scale = 1
+        norm_affine = True
+
+        if self.use_affine_time:
+            time_out_dim *= 2
+            time_scale = 1e-10
+            norm_affine = False
+
+        self.norm1 = nn.GroupNorm(32, in_channel)
+        self.activation1 = Swish()
+        self.conv1 = conv2d(in_channel, out_channel, 3, padding=1)
+
+        self.time = nn.Sequential(
+            Swish(), linear(time_dim, time_out_dim, scale=time_scale)
+        )
+
+        self.norm2 = nn.GroupNorm(32, out_channel, affine=norm_affine)
+        self.activation2 = Swish()
+        self.dropout = nn.Dropout(dropout)
+        self.conv2 = conv2d(out_channel, out_channel,
+                            3, padding=1, scale=1e-10)
+
+        if in_channel != out_channel:
+            self.skip = conv2d(in_channel, out_channel, 1)
+
+        else:
+            self.skip = None
+
+    def forward(self, input, time):
+        batch = input.shape[0]
+
+        out = self.conv1(self.activation1(self.norm1(input)))
+
+        if self.use_affine_time:
+            gamma, beta = self.time(time).view(batch, -1, 1, 1).chunk(2, dim=1)
+            out = (1 + gamma) * self.norm2(out) + beta
+
+        else:
+            out = out + self.time(time).view(batch, -1, 1, 1)
+            out = self.norm2(out)
+
+        out = self.conv2(self.dropout(self.activation2(out)))
+
+        if self.skip is not None:
+            input = self.skip(input)
+
+        return out + input
+
+
 class SelfAttention(nn.Module):
-    def __init__(self, channels, size):
-        super(SelfAttention, self).__init__()
-        self.channels = channels
-        self.size = size
-        self.mha = nn.MultiheadAttention(channels, 4, batch_first=True)
-        self.ln = nn.LayerNorm([channels])
-        self.ff_self = nn.Sequential(
-            nn.LayerNorm([channels]),
-            nn.Linear(channels, channels),
-            nn.GELU(),
-            nn.Linear(channels, channels),
-        )
-
-    def forward(self, x):
-        x = x.view(-1, self.channels, self.size * self.size).swapaxes(1, 2)
-        x_ln = self.ln(x)
-        attention_value, _ = self.mha(x_ln, x_ln, x_ln)
-        attention_value = attention_value + x
-        attention_value = self.ff_self(attention_value) + attention_value
-        return attention_value.swapaxes(2, 1).view(-1, self.channels, self.size, self.size)
-
-
-class DoubleConv(nn.Module):
-    def __init__(self, in_channels, out_channels, mid_channels=None, num_groups=32, residual=False):
-        super().__init__()
-        self.residual = residual
-        if not mid_channels:
-            mid_channels = out_channels
-        self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels,
-                      kernel_size=3, stride=1, padding=1, bias=False),
-            nn.GroupNorm(1 if in_channels == 1 else num_groups, mid_channels),
-            nn.GELU(),
-            nn.Conv2d(mid_channels, out_channels,
-                      kernel_size=3, stride=1, padding=1, bias=False),
-            nn.GroupNorm(1 if in_channels == 1 else num_groups, out_channels),
-        )
-
-    def forward(self, x, t=None):
-        if self.residual:
-            return F.gelu(x + self.double_conv(x))
-        else:
-            return self.double_conv(x)
-
-
-class Down(nn.Module):
-    def __init__(self, in_channels, out_channels, image_size, is_maxpool=True, has_attn=False, emb_dim=256):
-        super().__init__()
-        if is_maxpool:
-            DownSample = nn.MaxPool2d(2)
-        else:
-            DownSample = nn.Conv2d(
-                in_channels, in_channels, kernel_size=3, stride=2, padding=1)
-
-        self.down_conv = nn.Sequential(DownSample,
-                                       DoubleConv(
-                                           in_channels, in_channels, residual=True),
-                                       DoubleConv(
-                                           in_channels, out_channels),
-                                       )
-
-        self.emb_layer = nn.Sequential(
-            nn.SiLU(),
-            nn.Linear(
-                emb_dim,
-                out_channels
-            ),
-        )
-
-        if has_attn:
-            self.attn_layer = SelfAttention(out_channels, image_size)
-        else:
-            self.attn_layer = nn.Identity()
-
-    def forward(self, x, t):
-        x = self.down_conv(x)
-        emb = self.emb_layer(t)[:, :, None, None].repeat(
-            1, 1, x.shape[-2], x.shape[-1])
-        x = x + emb
-
-        return self.attn_layer(x)
-
-
-class MiddleBlock(nn.Module):
-
-    def __init__(self, in_channels, out_channels, has_attn=False):
-        super().__init__()
-        self.res1 = DoubleConv(in_channels, out_channels)
-        self.res2 = DoubleConv(out_channels, out_channels)
-        self.res3 = DoubleConv(out_channels, out_channels)
-
-    def forward(self, x):
-        x = self.res1(x)
-        x = self.res2(x)
-        x = self.res3(x)
-        return x
-
-
-class Up(nn.Module):
-    def __init__(self, in_channels, out_channels, out_image_dim, num_groups=32, emb_dim=256, has_attn=False, is_output=False, is_upsample=False):
+    def __init__(self, in_channel, n_head=1):
         super().__init__()
 
-        if is_upsample:
-            self.up = nn.Upsample(
-                scale_factor=2, mode="bilinear", align_corners=True)
-        else:
-            self.up = nn.ConvTranspose2d(
-                in_channels//2, in_channels//2, kernel_size=2, stride=2)
-        self.conv = nn.Sequential(
-            DoubleConv(in_channels, in_channels, residual=True),
-            DoubleConv(in_channels, out_channels, in_channels // 2),
-        )
+        self.n_head = n_head
 
-        if not is_output:
-            self.down_conv = nn.Sequential(nn.Conv2d(out_channels, out_channels//2,
-                                                     kernel_size=3, stride=1, padding=1, bias=False),
-                                           nn.GroupNorm(1 if in_channels == 1 else num_groups, out_channels//2))
-        else:
-            self.down_conv = nn.Identity()
+        self.norm = nn.GroupNorm(32, in_channel)
+        self.qkv = conv2d(in_channel, in_channel * 3, 1)
+        self.out = conv2d(in_channel, in_channel, 1, scale=1e-10)
 
-        self.emb_layer = nn.Sequential(
-            nn.SiLU(),
-            nn.Linear(
-                emb_dim,
-                out_channels
-            ),
-        )
+    def forward(self, input):
+        batch, channel, height, width = input.shape
+        n_head = self.n_head
+        head_dim = channel // n_head
 
-        if has_attn:
-            self.attn_layer = SelfAttention(out_channels, out_image_dim)
-        else:
-            self.attn_layer = nn.Identity()
+        norm = self.norm(input)
+        qkv = self.qkv(norm).view(batch, n_head, head_dim * 3, height, width)
+        query, key, value = qkv.chunk(3, dim=2)  # bhdyx
 
-    def forward(self, x, skip_x, t):
-        if x.shape[-1] != skip_x.shape[-1]:
-            x = self.up(x)
-        x = torch.cat([skip_x, x], dim=1)
-        x = self.conv(x)
-        emb = self.emb_layer(t)[:, :, None, None].repeat(
-            1, 1, x.shape[-2], x.shape[-1])
-        x = x + emb
-        return self.down_conv(self.attn_layer(x))
+        attn = torch.einsum(
+            "bnchw, bncyx -> bnhwyx", query, key
+        ).contiguous() / math.sqrt(channel)
+        attn = attn.view(batch, n_head, height, width, -1)
+        attn = torch.softmax(attn, -1)
+        attn = attn.view(batch, n_head, height, width, height, width)
+
+        out = torch.einsum("bnhwyx, bncyx -> bnchw", attn, value).contiguous()
+        out = self.out(out.view(batch, channel, height, width))
+
+        return out + input
 
 
-class UNetUnconditionalDeep(nn.Module):
-    def __init__(self, c_in=1, c_out=1, n_channels=[64, 128, 256, 512, 1024], time_dim=256, image_size=224, device="cuda"):
+class TimeEmbedding(nn.Module):
+    def __init__(self, dim):
         super().__init__()
-        self.device = device
-        self.time_dim = time_dim
-        self.channels = n_channels
 
-        in_channel = c_in
-        n_resolution = len(self.channels)
+        self.dim = dim
 
-        attn = [False]*(n_resolution-1)  # True for attention layers
-        up_isfinal = [False]*(n_resolution-2)
-        up_isfinal.append(True)
-
-        # Down
-        down = []
-        down_mul = 2
-        down_channels = self.channels
-        for i in range(n_resolution-1):
-            if in_channel == c_in:
-                out_channel = down_channels[i]
-                down.append(DoubleConv(in_channel, out_channel))
-                in_channel = out_channel
-            out_channel = down_channels[i+1]
-            down.append(Down(in_channel, out_channel,
-                        image_size//down_mul, has_attn=attn[i]))
-            down_mul *= 2
-            in_channel = out_channel
-
-        self.down = nn.ModuleList(down)
-
-        # Middle
-        middle_channel = self.channels
-        in_channel = middle_channel[-1]
-        out_channel = middle_channel[-2]
-        self.middle = MiddleBlock(in_channel, out_channel)
-
-        # Up
-        up = []
-        up_mul = down_mul//4
-        up_channels = self.channels
-        up_channels.reverse()
-        for i in range(n_resolution-1):
-            out_channel = up_channels[i+1]
-            up.append(Up(in_channel, out_channel,
-                         image_size//up_mul, has_attn=attn[i], is_output=up_isfinal[i]))
-            up_mul //= 2
-            in_channel = out_channel
-
-        up.append(nn.Conv2d(in_channel, c_out, kernel_size=1))
-
-        self.up = nn.ModuleList(up)
-
-    def pos_encoding(self, t, channels):
-        inv_freq = 1.0 / (
-            10000
-            ** (torch.arange(0, channels, 2, device=self.device).float() / channels)
+        inv_freq = torch.exp(
+            torch.arange(0, dim, 2, dtype=torch.float32) *
+            (-math.log(10000) / dim)
         )
-        pos_enc_a = torch.sin(t.repeat(1, channels // 2) * inv_freq)
-        pos_enc_b = torch.cos(t.repeat(1, channels // 2) * inv_freq)
-        pos_enc = torch.cat([pos_enc_a, pos_enc_b], dim=-1)
-        return pos_enc
 
-    def forward(self, x, t):
-        t = t.unsqueeze(-1).type(torch.float)
-        t = self.pos_encoding(t, self.time_dim)
+        self.register_buffer("inv_freq", inv_freq)
 
-        # Encoder
-        h = []  # store conv output for skip connection
-        for m in self.down:
-            x = m(x, t)
-            h.append(x)
+    def forward(self, input):
+        shape = input.shape
+        sinusoid_in = torch.ger(input.view(-1).float(), self.inv_freq)
+        pos_emb = torch.cat([sinusoid_in.sin(), sinusoid_in.cos()], dim=-1)
+        pos_emb = pos_emb.view(*shape, self.dim)
 
-        # Latent space
-        x = self.middle(x)
+        return pos_emb
 
-        # Decoder
-        h.reverse()
-        for idx in range(len(self.up)-1):
-            skip_x = h[idx+1]
-            x = self.up[idx](x, skip_x, t)
 
-        # Last layer
-        out = self.up[-1](x)
+class ResBlockWithAttention(nn.Module):
+    def __init__(
+        self,
+        in_channel,
+        out_channel,
+        time_dim,
+        dropout,
+        use_attention=False,
+        attention_head=1,
+        use_affine_time=False,
+    ):
+        super().__init__()
+
+        self.resblocks = ResBlock(
+            in_channel, out_channel, time_dim, use_affine_time, dropout
+        )
+
+        if use_attention:
+            self.attention = SelfAttention(out_channel, n_head=attention_head)
+
+        else:
+            self.attention = None
+
+    def forward(self, input, time):
+        out = self.resblocks(input, time)
+
+        if self.attention is not None:
+            out = self.attention(out)
 
         return out
 
 
-class UNetConditionalDeep(nn.Module):
-    def __init__(self, c_in=1, c_out=1, n_channels=[64, 128, 256, 512, 1024], time_dim=256, num_classes=None, image_size=224, device="cuda"):
+def spatial_fold(input, fold):
+    if fold == 1:
+        return input
+
+    batch, channel, height, width = input.shape
+    h_fold = height // fold
+    w_fold = width // fold
+
+    return (
+        input.view(batch, channel, h_fold, fold, w_fold, fold)
+        .permute(0, 1, 3, 5, 2, 4)
+        .reshape(batch, -1, h_fold, w_fold)
+    )
+
+
+def spatial_unfold(input, unfold):
+    if unfold == 1:
+        return input
+
+    batch, channel, height, width = input.shape
+    h_unfold = height * unfold
+    w_unfold = width * unfold
+
+    return (
+        input.view(batch, -1, unfold, unfold, height, width)
+        .permute(0, 1, 4, 2, 5, 3)
+        .reshape(batch, -1, h_unfold, w_unfold)
+    )
+
+
+class UNetUnconditionalDeeper(nn.Module):
+    def __init__(
+        self,
+        in_channel: StrictInt,
+        out_channel: StrictInt,
+        channel: StrictInt,
+        channel_multiplier: List[StrictInt],
+        n_res_blocks: StrictInt,
+        attn_strides: List[StrictInt],
+        attn_heads: StrictInt = 1,
+        use_affine_time: StrictBool = False,
+        dropout: StrictFloat = 0,
+        fold: StrictInt = 1,
+    ):
         super().__init__()
-        self.device = device
-        self.time_dim = time_dim
-        self.channels = n_channels
 
-        in_channel = c_in
-        n_resolution = len(self.channels)
-        attn = [False]*(n_resolution-1)  # True for attention layers
-        up_isfinal = [False]*(n_resolution-2)
-        up_isfinal.append(True)
+        self.fold = fold
 
-        # Down
-        down = []
-        down_mul = 2
-        down_channels = self.channels
-        for i in range(n_resolution-1):
-            if in_channel == c_in:
-                out_channel = down_channels[i]
-                down.append(DoubleConv(in_channel, out_channel))
-                in_channel = out_channel
-            out_channel = down_channels[i+1]
-            down.append(Down(in_channel, out_channel,
-                        image_size//down_mul, has_attn=attn[i]))
-            down_mul *= 2
-            in_channel = out_channel
+        time_dim = channel * 4
 
-        self.down = nn.ModuleList(down)
+        n_block = len(channel_multiplier)
 
-        # Middle
-        middle_channel = self.channels
-        in_channel = middle_channel[-1]
-        out_channel = middle_channel[-2]
-        self.middle = MiddleBlock(in_channel, out_channel)
+        self.time = nn.Sequential(
+            TimeEmbedding(channel),
+            linear(channel, time_dim),
+            Swish(),
+            linear(time_dim, time_dim),
+        )
 
-        # Up
-        up = []
-        up_mul = down_mul//4
-        up_channels = self.channels
-        up_channels.reverse()
-        for i in range(n_resolution-1):
-            out_channel = up_channels[i+1]
-            up.append(Up(in_channel, out_channel,
-                         image_size//up_mul, has_attn=attn[i], is_output=up_isfinal[i]))
-            up_mul //= 2
-            in_channel = out_channel
+        down_layers = [conv2d(in_channel * (fold ** 2), channel, 3, padding=1)]
+        feat_channels = [channel]
+        in_channel = channel
+        for i in range(n_block):
+            for _ in range(n_res_blocks):
+                channel_mult = channel * channel_multiplier[i]
 
-        up.append(nn.Conv2d(in_channel, c_out, kernel_size=1))
+                down_layers.append(
+                    ResBlockWithAttention(
+                        in_channel,
+                        channel_mult,
+                        time_dim,
+                        dropout,
+                        use_attention=2 ** i in attn_strides,
+                        attention_head=attn_heads,
+                        use_affine_time=use_affine_time,
+                    )
+                )
 
-        self.up = nn.ModuleList(up)
+                feat_channels.append(channel_mult)
+                in_channel = channel_mult
+
+            if i != n_block - 1:
+                down_layers.append(Downsample(in_channel))
+                feat_channels.append(in_channel)
+
+        self.down = nn.ModuleList(down_layers)
+
+        self.mid = nn.ModuleList(
+            [
+                ResBlockWithAttention(
+                    in_channel,
+                    in_channel,
+                    time_dim,
+                    dropout=dropout,
+                    use_attention=True,
+                    attention_head=attn_heads,
+                    use_affine_time=use_affine_time,
+                ),
+                ResBlockWithAttention(
+                    in_channel,
+                    in_channel,
+                    time_dim,
+                    dropout=dropout,
+                    use_affine_time=use_affine_time,
+                ),
+            ]
+        )
+
+        up_layers = []
+        for i in reversed(range(n_block)):
+            for _ in range(n_res_blocks + 1):
+                channel_mult = channel * channel_multiplier[i]
+
+                up_layers.append(
+                    ResBlockWithAttention(
+                        in_channel + feat_channels.pop(),
+                        channel_mult,
+                        time_dim,
+                        dropout=dropout,
+                        use_attention=2 ** i in attn_strides,
+                        attention_head=attn_heads,
+                        use_affine_time=use_affine_time,
+                    )
+                )
+
+                in_channel = channel_mult
+
+            if i != 0:
+                up_layers.append(Upsample(in_channel))
+
+        self.up = nn.ModuleList(up_layers)
+
+        self.out = nn.Sequential(
+            nn.GroupNorm(32, in_channel),
+            Swish(),
+            conv2d(in_channel, out_channel * (fold ** 2),
+                   3, padding=1, scale=1e-10),
+        )
+
+    def forward(self, input, time):
+        time_embed = self.time(time)
+
+        feats = []
+
+        out = spatial_fold(input, self.fold)
+        for layer in self.down:
+            if isinstance(layer, ResBlockWithAttention):
+                out = layer(out, time_embed)
+
+            else:
+                out = layer(out)
+
+            feats.append(out)
+
+        for layer in self.mid:
+            out = layer(out, time_embed)
+
+        for layer in self.up:
+            if isinstance(layer, ResBlockWithAttention):
+                out = layer(torch.cat((out, feats.pop()), 1), time_embed)
+            else:
+                out = layer(out)
+
+        out = self.out(out)
+        out = spatial_unfold(out, self.fold)
+
+        return out
+
+
+class UNetConditionalDeeper(nn.Module):
+    def __init__(
+        self,
+        in_channel: StrictInt,
+        out_channel: StrictInt,
+        num_classes: StrictInt,
+        channel: StrictInt,
+        channel_multiplier: List[StrictInt],
+        n_res_blocks: StrictInt,
+        attn_strides: List[StrictInt],
+        attn_heads: StrictInt = 1,
+        use_affine_time: StrictBool = False,
+        dropout: StrictFloat = 0,
+        fold: StrictInt = 1,
+    ):
+        super().__init__()
+
+        self.fold = fold
+
+        time_dim = channel * 4
+
+        n_block = len(channel_multiplier)
+
+        self.time = nn.Sequential(
+            TimeEmbedding(channel),
+            linear(channel, time_dim),
+            Swish(),
+            linear(time_dim, time_dim),
+        )
+
+        down_layers = [conv2d(in_channel * (fold ** 2), channel, 3, padding=1)]
+        feat_channels = [channel]
+        in_channel = channel
+        for i in range(n_block):
+            for _ in range(n_res_blocks):
+                channel_mult = channel * channel_multiplier[i]
+
+                down_layers.append(
+                    ResBlockWithAttention(
+                        in_channel,
+                        channel_mult,
+                        time_dim,
+                        dropout,
+                        use_attention=2 ** i in attn_strides,
+                        attention_head=attn_heads,
+                        use_affine_time=use_affine_time,
+                    )
+                )
+
+                feat_channels.append(channel_mult)
+                in_channel = channel_mult
+
+            if i != n_block - 1:
+                down_layers.append(Downsample(in_channel))
+                feat_channels.append(in_channel)
+
+        self.down = nn.ModuleList(down_layers)
+
+        self.mid = nn.ModuleList(
+            [
+                ResBlockWithAttention(
+                    in_channel,
+                    in_channel,
+                    time_dim,
+                    dropout=dropout,
+                    use_attention=True,
+                    attention_head=attn_heads,
+                    use_affine_time=use_affine_time,
+                ),
+                ResBlockWithAttention(
+                    in_channel,
+                    in_channel,
+                    time_dim,
+                    dropout=dropout,
+                    use_affine_time=use_affine_time,
+                ),
+            ]
+        )
+
+        up_layers = []
+        for i in reversed(range(n_block)):
+            for _ in range(n_res_blocks + 1):
+                channel_mult = channel * channel_multiplier[i]
+
+                up_layers.append(
+                    ResBlockWithAttention(
+                        in_channel + feat_channels.pop(),
+                        channel_mult,
+                        time_dim,
+                        dropout=dropout,
+                        use_attention=2 ** i in attn_strides,
+                        attention_head=attn_heads,
+                        use_affine_time=use_affine_time,
+                    )
+                )
+
+                in_channel = channel_mult
+
+            if i != 0:
+                up_layers.append(Upsample(in_channel))
+
+        self.up = nn.ModuleList(up_layers)
+
+        self.out = nn.Sequential(
+            nn.GroupNorm(32, in_channel),
+            Swish(),
+            conv2d(in_channel, out_channel * (fold ** 2),
+                   3, padding=1, scale=1e-10),
+        )
 
         if num_classes is not None:
             self.label_emb = nn.Embedding(num_classes, time_dim)
 
-    def pos_encoding(self, t, channels):
-        inv_freq = 1.0 / (
-            10000
-            ** (torch.arange(0, channels, 2, device=self.device).float() / channels)
-        )
-        pos_enc_a = torch.sin(t.repeat(1, channels // 2) * inv_freq)
-        pos_enc_b = torch.cos(t.repeat(1, channels // 2) * inv_freq)
-        pos_enc = torch.cat([pos_enc_a, pos_enc_b], dim=-1)
-        return pos_enc
-
-    def forward(self, x, t, y):
-        t = t.unsqueeze(-1).type(torch.float)
-        t = self.pos_encoding(t, self.time_dim)
+    def forward(self, input, time, label):
+        time_embed = self.time(time)
 
         # Add Label to Time Embedding
-        if y is not None:
-            t += self.label_emb(y)
+        if label is not None:
+            time_embed += self.label_emb(label)
 
-        # Encoder
-        h = []  # store conv output for skip connection
-        for m in self.down:
-            x = m(x, t)
-            h.append(x)
+        feats = []
 
-        # Latent space
-        x = self.middle(x)
+        out = spatial_fold(input, self.fold)
+        for layer in self.down:
+            if isinstance(layer, ResBlockWithAttention):
+                out = layer(out, time_embed)
 
-        # Decoder
-        h.reverse()
-        for idx in range(len(self.up)-1):
-            skip_x = h[idx+1]
-            x = self.up[idx](x, skip_x, t)
+            else:
+                out = layer(out)
 
-        # Last layer
-        out = self.up[-1](x)
+            feats.append(out)
+
+        for layer in self.mid:
+            out = layer(out, time_embed)
+
+        for layer in self.up:
+            if isinstance(layer, ResBlockWithAttention):
+                out = layer(torch.cat((out, feats.pop()), 1), time_embed)
+            else:
+                out = layer(out)
+
+        out = self.out(out)
+        out = spatial_unfold(out, self.fold)
 
         return out
-
-# if __name__ == '__main__':
-#     IMG_SIZE = 128
-#     # net = UNet(device="cpu", image_size=IMG_SIZE)
-#     con_net = UNet_conditional(
-#         num_classes=10, image_size=IMG_SIZE, device="cpu")
-#     print(con_net.parameters)
-#     print(sum([p.numel() for p in con_net.parameters()]))
-#     x = torch.randn(1, 1, IMG_SIZE, IMG_SIZE)
-#     t = x.new_tensor([500] * x.shape[0]).long()
-#     y = x.new_tensor([1] * x.shape[0]).long()
-#     out = con_net(x, t, y)
-#     print(out.shape)

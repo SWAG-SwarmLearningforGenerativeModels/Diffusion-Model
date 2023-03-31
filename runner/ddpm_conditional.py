@@ -150,7 +150,7 @@ class ConditionDiffusion:
         if self.args.resume_training:
             # load it
             states = torch.load(os.path.join(
-                self.args.log_path, "models", 'ckpt_states.pt'))
+                self.args.log_path, "models", 'ckpt_model.pt'))
             model.load_state_dict(states[0], strict=True)
             ema_model.load_state_dict(states[1], strict=True)
 
@@ -158,7 +158,7 @@ class ConditionDiffusion:
             start_epoch = states[3]
             print('Pretrained model loaded successfully')
 
-        for epoch in range(start_epoch, self.config.training.n_epochs):
+        for epoch in range(start_epoch+1, self.config.training.n_epochs):
             model.train()
             logging.info(f"Starting epoch {epoch}:")
             pbar = tqdm(dataloader)
@@ -204,10 +204,29 @@ class ConditionDiffusion:
                             self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=self.config.data.num.classes)
 
                     torch.save(states, os.path.join(self.args.log_path,
-                                                    'models', 'ckpt_states.pt'.format(epoch)))
+                                                    'models', 'ckpt_model.pt'.format(epoch)))
 
-                    torch.save(model, os.path.join(self.args.log_path,
+                    torch.save(states, os.path.join(self.args.log_path,
                                                    'models', 'ckpt_model_{}.pt'.format(epoch)))
 
-                    torch.save(ema_model, os.path.join(self.args.log_path,
-                                                       'models', 'ckpt_ema_model_{}.pt'.format(epoch)))
+    def generate(self):
+
+        model = get_model(args=self.args, config=self.config,
+                          model_config=self.model_config)
+
+        model.to(self.device)
+
+        states = torch.load(os.path.join(
+            self.args.log_path, "models", 'ckpt_model.pt'))
+        model.load_state_dict(states[0], strict=True)
+
+        labels = torch.arange(self.config.data.num_classes).repeat(
+            1, self.config.sampling.batch_size).squeeze().long().to(self.device)
+
+        for i in range(10):
+
+            sampled_images = self.sample(
+                model, n=len(labels), labels=labels)
+
+            save_image(sampled_images, os.path.join(
+                self.args.log_path, 'samples', f"{i}.jpg"), nrow=int(sampled_images.shape[0]**0.5))

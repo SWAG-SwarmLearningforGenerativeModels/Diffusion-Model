@@ -18,14 +18,14 @@ def parse_args_and_config():
 
     parser = argparse.ArgumentParser(description=globals()['__doc__'])
 
-    parser.add_argument('--config', type=str, default='rsna_pe.yml', required=True,
-                        help='Path to the config file')
+    parser.add_argument('--config', type=str, default='rsna_pe.yml',
+                        required=True, help='Path to the config file')
     parser.add_argument('--seed', type=int, default=1234, help='Random seed')
     parser.add_argument('--exp', type=str, default='exp',
                         help='Path for saving running related data.')
     parser.add_argument('--doc', type=str, required=True, default='rsna_pe', help='A string for documentation purpose. '
                         'Will be the name of the log folder.')
-    parser.add_argument('--sample', action='store_true',
+    parser.add_argument('--sample', default=False,
                         help='Whether to produce samples from the model')
     parser.add_argument('--conditional', default=False,
                         help='Whether to train a conditional or unconditional model')
@@ -33,7 +33,9 @@ def parse_args_and_config():
                         help='Whether to resume training')
 
     args = parser.parse_args()
-    args.log_path = os.path.join(args.exp, 'logs', args.doc)
+
+    args.log_path = os.path.join(
+        args.exp, 'logs', args.doc, f'conditional' if args.conditional else 'unconditional')
 
     # parse config file
     # Data config
@@ -53,6 +55,8 @@ def parse_args_and_config():
     def setup_logging(args):
         os.makedirs(os.path.join(args.log_path, "models"), exist_ok=True)
         os.makedirs(os.path.join(args.log_path, 'results'), exist_ok=True)
+        os.makedirs(os.path.join(args.log_path, 'samples'), exist_ok=True)
+
         os.makedirs(new_config.logger, exist_ok=True)
 
     # Create experiment paths
@@ -96,19 +100,34 @@ def main():
     print(yaml.dump(config_dict, default_flow_style=False))
     print("<" * 100)
 
-    try:
-        print("Initializing Model ... ")
-        if args.conditional:
-            print("Loading Conditional Model ... ")
-            cond_runner = ConditionDiffusion(args, config, model_config)
-            cond_runner.train()
-        else:
-            print("Loading Unconditional Model ... ")
-            uncond_runner = UnconditionDiffusion(args, config, model_config)
-            uncond_runner.train()
+    print("Initializing Model ... ")
+    if args.sample:
+        try:
+            if args.conditional:
+                cond_runner = ConditionDiffusion(args, config, model_config)
+                cond_runner.generate()
+            else:
+                uncond_runner = UnconditionDiffusion(
+                    args, config, model_config)
+                uncond_runner.generate()
 
-    except:
-        logging.error(traceback.format_exc())
+        except:
+
+            logging.error(traceback.format_exc())
+
+    else:
+        try:
+            if args.conditional:
+                cond_runner = ConditionDiffusion(args, config, model_config)
+                cond_runner.train()
+            else:
+                uncond_runner = UnconditionDiffusion(
+                    args, config, model_config)
+                uncond_runner.train()
+
+        except:
+
+            logging.error(traceback.format_exc())
 
     return 0
 

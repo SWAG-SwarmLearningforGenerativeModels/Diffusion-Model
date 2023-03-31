@@ -2,7 +2,7 @@
 device: "cuda"
 
 training:
-  batch_size: 4
+  batch_size: 8
   n_epochs: 1000
   snapshot_freq: 5
   snapshot_sampling: true

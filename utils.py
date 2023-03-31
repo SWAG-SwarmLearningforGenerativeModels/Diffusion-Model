@@ -1,15 +1,10 @@
 from matplotlib import pyplot as plt
-from PIL import Image
-import torchvision
 import torch
-import torch.utils.data
-
 
 def gather(consts: torch.Tensor, t: torch.Tensor):
     """Gather consts for $t$ and reshape to feature map shape"""
     c = consts.gather(-1, t)
     return c.reshape(-1, 1, 1, 1)
-
 
 def plot_images(images):
     plt.figure(figsize=(32, 32))
@@ -19,14 +14,8 @@ def plot_images(images):
     plt.show()
 
 
-def save_images(images, path, **kwargs):
-    grid = torchvision.utils.make_grid(images, kwargs['nrow'])
-    ndarr = grid.permute(1, 2, 0).to('cpu').numpy()
-    im = Image.fromarray(ndarr)
-    im.save(path)
-
-
 def inverse_transform(inp_tensor):
+    # Scale image from [-1,1] to [0,1]
     invTrans = (inp_tensor.clamp(-1, 1) + 1) / 2
-    invTrans = (invTrans * 255).type(torch.uint8)
+
     return invTrans

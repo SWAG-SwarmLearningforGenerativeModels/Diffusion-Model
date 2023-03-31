@@ -1,12 +1,13 @@
-from unet.modules import UNetUnconditionalDeep, UNetConditionalDeep
-from unet.modules2 import UNetUnconditionalDeeper, UNetConditionalDeeper
+from unet.modules import UNetUnconditionalDeeper, UNetConditionalDeeper
+from unet.modulesv2 import UNetUnconditionalDeep, UNetConditionalDeep
 import torch.optim as optim
 
 
 def get_model(args, config, model_config):
+    print('Loading Model ...')
 
     if args.conditional:
-        if config.data.image_size < 192:
+        if config.data.image_size < 224:
             model = UNetConditionalDeep(c_in=config.data.channels, c_out=config.data.channels,
                                         num_classes=config.data.num_classes, image_size=config.data.image_size)
         else:
@@ -24,7 +25,7 @@ def get_model(args, config, model_config):
                                           )
 
     else:
-        if config.data.image_size < 192:
+        if config.data.image_size < 224:
             model = UNetUnconditionalDeep(c_in=config.data.channels, c_out=config.data.channels,
                                           image_size=config.data.image_size)
         else:
