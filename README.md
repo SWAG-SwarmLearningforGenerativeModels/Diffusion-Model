@@ -21,13 +21,13 @@ A diffusion model repo. Images can be trained `conditionally` or `unconditionall
 4. Initialize script with ```python main.py --config config_file.yml ---doc project_name --conditional True```.
 
 #### 1.3 - Resume Training
-1. Resume tarining using the script ```python main.py --config config_file.yml ---doc project_name --resume_training True```.
+1. Resume training ```python main.py --config config_file.yml ---doc project_name --resume_training True```.
 
 
 ## 2 - Sampling
 
-1. To generate samples conditionally and unconditionally ```python main.py --config config_file.yml ---doc project_name --sample True```.
-2. Images are stored in ```.../exp/logs/project_name/unconditional/samples``` path.
+1. To generate samples  ```python main.py --config config_file.yml ---doc project_name --sample True```.
+2. Sampled images are stored in ```.../exp/logs/project_name/(un)conditional/samples``` path.
 
 ### 2.1 - X-Ray (Unconditional)
 Generated chest x-ray images (224 x 224 resolutions)
