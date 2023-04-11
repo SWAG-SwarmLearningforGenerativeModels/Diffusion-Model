@@ -191,23 +191,33 @@ class ConditionDiffusion:
                     ]
 
                     if self.config.training.snapshot_sampling:
+
+                        # Save Model
+                        torch.save(states, os.path.join(self.args.log_path,
+                                                        'models', 'ckpt_model.pt'.format(epoch)))
+
+                        torch.save(states, os.path.join(self.args.log_path,
+                                                        'models', 'ckpt_model_{}.pt'.format(epoch)))
+
+                        # Sample new image
+
+                        # Set class labels
                         labels = torch.arange(self.config.data.num_classes).repeat(
                             1, self.config.sampling.batch_size).squeeze().long().to(self.device)
+
+                        # Sample images from model
                         sampled_images = self.sample(
                             model, n=len(labels), labels=labels)
+
+                        # Sample images from ema model
                         ema_sampled_images = self.sample(
                             ema_model, n=len(labels), labels=labels)
 
+                        # Save images
                         save_image(sampled_images, os.path.join(
-                            self.args.log_path, 'results', f"{epoch}.jpg"), nrow=self.config.data.num.classes)
+                            self.args.log_path, 'results', f"{epoch}.jpg"), nrow=self.config.data.num_classes)
                         save_image(ema_sampled_images, os.path.join(
-                            self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=self.config.data.num.classes)
-
-                    torch.save(states, os.path.join(self.args.log_path,
-                                                    'models', 'ckpt_model.pt'.format(epoch)))
-
-                    torch.save(states, os.path.join(self.args.log_path,
-                                                   'models', 'ckpt_model_{}.pt'.format(epoch)))
+                            self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=self.config.data_num.classes)
 
     def generate(self):
 
@@ -223,7 +233,7 @@ class ConditionDiffusion:
         labels = torch.arange(self.config.data.num_classes).repeat(
             1, self.config.sampling.batch_size).squeeze().long().to(self.device)
 
-        for i in range(10):
+        for i in range(self.config.sampling.num_batches):
 
             sampled_images = self.sample(
                 model, n=len(labels), labels=labels)

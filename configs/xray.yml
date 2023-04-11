@@ -10,13 +10,14 @@ training:
 
 sampling: 
   batch_size: 4
+  num_batches: 10
   data_init: false
 
 data:
   dataset: xray
   image_size: 224
   num_classes: 1
-  train_path: /home/domainHomes/aokolie/Desktop/Augustine Workspace/SWAG PROJECT/datasets/X-Rays/datasets/CXR14/CXR14/files/images_001
+  train_path: /path/to/images
   channels: 1
   rescaled: false
   random_flip: false

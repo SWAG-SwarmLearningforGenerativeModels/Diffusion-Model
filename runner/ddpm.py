@@ -182,12 +182,14 @@ class UnconditionDiffusion:
                         epoch
                     ]
 
+                    # Save models
                     torch.save(states, os.path.join(self.args.log_path,
                                                     'models', 'ckpt_model.pt'.format(epoch)))
 
                     torch.save(states, os.path.join(self.args.log_path,
                                                     'models', 'ckpt_model_{}.pt'.format(epoch)))
 
+                    # Sample new images
                     if self.config.training.snapshot_sampling:
                         sampled_images = self.sample(
                             model, n=self.config.sampling.batch_size)
@@ -212,7 +214,7 @@ class UnconditionDiffusion:
 
         print('Pretrained model loaded successfully')
 
-        for i in range(1, 2):
+        for i in range(self.config.sampling.num_batches):
             sampled_images = self.sample(
                 model, n=self.config.sampling.batch_size)
 
