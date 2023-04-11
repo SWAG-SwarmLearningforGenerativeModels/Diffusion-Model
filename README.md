@@ -11,7 +11,7 @@ A diffusion model repo. Images can be trained `conditionally` or `unconditionall
 3. In dataloaders.py, create a dataloader for your images within the ```get_data``` function. 
 4. Initialize script with ```python main.py --config config_file.yml ---doc project_name```.
 5. Project info is logged in ```.../exp/logs/project_name/unconditional/...``` path.
-6. At different snapshot_frequencies, save model (snapshot_freq parameter is set under ```training``` attribute in the ```config_file.yml file```).
+6. Save model (snapshot_freq parameter is set under ```training``` attribute in the ```config_file.yml file```).
 
 #### 1.2 - Conditional Training
 
@@ -26,7 +26,7 @@ A diffusion model repo. Images can be trained `conditionally` or `unconditionall
 
 ## 2 - Sampling
 
-1. To generate samples conditionally and unconditionally, use script ```python main.py --config config_file.yml ---doc project_name --sample True```.
+1. To generate samples conditionally and unconditionally ```python main.py --config config_file.yml ---doc project_name --sample True```.
 2. Images are stored in ```.../exp/logs/project_name/unconditional/samples``` path.
 
 ### 2.1 - X-Ray (Unconditional)
