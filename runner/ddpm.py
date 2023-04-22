@@ -21,7 +21,7 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s",
 
 
 class UnconditionDiffusion:
-    def __init__(self, args, config, model_config, noise_steps=1000, schedule="linear", beta_start=1e-4, beta_end=0.02, img_size=256):
+    def __init__(self, args, config, model_config, noise_steps=1000, schedule="linear", beta_start=1e-4, beta_end=0.02):
 
         self.config = config
         self.model_config = model_config
@@ -36,7 +36,6 @@ class UnconditionDiffusion:
         self.alpha = 1. - self.beta
         self.alpha_hat = torch.cumprod(self.alpha, dim=0)
 
-        self.img_size = img_size
         self.mse_loss = nn.MSELoss()
 
     def prepare_noise_schedule(self, cosine_s=8e-3):
@@ -108,8 +107,8 @@ class UnconditionDiffusion:
         logging.info(f"Sampling {n} new images....")
 
         with torch.no_grad():
-            x = torch.randn((n, self.config.data.channels,
-                            self.img_size, self.img_size)).to(self.device)
+            x = torch.randn((n, self.config.data.channels, self.config.data.image_size,
+                            self.config.data.image_size)).to(self.device)
             for i in tqdm(reversed(range(1, self.noise_steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
                 if i > 1:
