@@ -2,7 +2,7 @@
 
 A diffusion model repo. Images can be trained `conditionally` or `unconditionally`. 
 
-## 1. This repo has the folder structure
+### 1. This repo has the folder structure
 
 <pre>
 ```
