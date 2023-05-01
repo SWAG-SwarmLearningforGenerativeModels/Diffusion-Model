@@ -22,48 +22,7 @@ def get_data(config):
 
     global transforms
 
-    if config.data.dataset == 'landscape':
-
-        transforms = torchvision.transforms.Compose([
-            torchvision.transforms.Resize(80),
-            torchvision.transforms.RandomResizedCrop(
-                config.data.image_size, scale=(0.8, 1.0)),
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
-
-        dataset = torchvision.datasets.ImageFolder(
-            config.data.train_path, transform=transforms)
-
-        print(f'Length of training dataset: {len(dataset)}')
-
-        dataloader = DataLoader(
-            dataset, batch_size=config.training.batch_size, num_workers=config.data.num_workers, shuffle=True)
-
-    elif config.data.dataset == 'cifar10':
-
-        transform = torchvision.transforms.Compose([
-            torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
-
-        trainset = torchvision.datasets.CIFAR10(root=config.data.train_path, train=True,
-                                                download=True, transform=transform)
-
-        testset = torchvision.datasets.CIFAR10(root=config.data.train_path, train=False,
-                                               download=True, transform=transform)
-
-        c_dataset = torch.utils.data.ConcatDataset(
-            [trainset, testset])
-
-        print(f'Length of training dataset: {len(c_dataset)}')
-
-        trainloader = torch.utils.data.DataLoader(c_dataset, batch_size=config.training.batch_size,
-                                                  shuffle=True, num_workers=config.data.num_workers)
-
-        # classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-
-    elif config.data.dataset == 'brain':
+    if config.data.dataset == 'brain':
 
         transforms = torchvision.transforms.Compose([
             torchvision.transforms.ToTensor(),
@@ -97,6 +56,53 @@ def get_data(config):
             config.data.train_path, transform=transforms)
 
         print(f'Length of training dataset: {len(train_dataset)}')
+        dataloader = DataLoader(
+            train_dataset, batch_size=config.training.batch_size, num_workers=config.data.num_workers, shuffle=True)
+
+    elif config.data.dataset == 'abdomenCT':
+        class AbdomenCT(Dataset):
+            def __init__(self):
+
+                # Attributes
+                self.image_size = config.data.image_size
+                self.channels = config.data.channels
+
+                self.data_path = config.data.train_path
+                self.files = os.listdir(self.data_path)
+
+            def __len__(self):
+                # Total number of slices from all scans
+                return len(self.files)
+
+            def transform(self, img):
+                image_transform = torchvision.transforms.Compose([
+                    torchvision.transforms.Grayscale(1),
+                    torchvision.transforms.Resize(self.image_size),
+                    torchvision.transforms.ToTensor(),
+                    torchvision.transforms.Normalize(mean=(0.5), std=(0.5))
+                ])
+
+                return image_transform(img)
+
+            def __getitem__(self, idx):
+                # Convert to numerical
+                if torch.is_tensor(idx):
+                    idx = idx.tolist()
+
+                # Train data
+                sitk_t1 = sitk.ReadImage(os.path.join(
+                    self.data_path, self.file[idx]))
+                # and access the numpy array:
+                img = sitk.GetArrayFromImage(sitk_t1)
+                image = Image.fromarray(self.stand(img))
+                image = self.transform(image)
+
+                return image, torch.tensor(1)
+
+        train_dataset = AbdomenCT()
+
+        print(f'Length of training dataset: {len(train_dataset)}')
+
         dataloader = DataLoader(
             train_dataset, batch_size=config.training.batch_size, num_workers=config.data.num_workers, shuffle=True)
 

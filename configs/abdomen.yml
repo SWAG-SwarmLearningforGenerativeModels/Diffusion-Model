@@ -16,7 +16,7 @@ data:
   dataset: abdomenCT
   image_size: 224
   num_classes: 1
-  train_path: None
+  train_path: path/to/data
   channels: 1
   rescaled: false
   random_flip: false
