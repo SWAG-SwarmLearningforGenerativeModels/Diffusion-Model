@@ -4,25 +4,29 @@ A diffusion model repo. Images can be trained `conditionally` or `unconditionall
 
 ## 1. This repo has the folder structure
 
+<pre>
+```
 project_root/
     ├── configs/
-    |     ├── model.yml
-    |     └── abdomen.yml
-    |     └── xray.yml
-    |── data/
-    |     ├── abdomen_ct/
-    |     ├── xray/
-    │── runner/
+    │     ├── model.yml
+    │     ├── abdomen.yml
+    │     └── xray.yml
+    ├── data/
+    │     ├── abdomen_ct/
+    │     └── xray/
+    ├── runner/
     │     ├── ddpm_conditional.py
     │     └── conditional.py
-    │── unet/
+    ├── unet/
     │     ├── __init__.py
     │     └── modules.py
-    │── dataloaders.py
-    │── main.py
-    ├── README.md/
-    |── requirement.txt
-    |── utils.py
+    ├── dataloaders.py
+    ├── main.py
+    ├── README.md
+    ├── requirements.txt
+    └── utils.py
+```
+</pre>
 
 ### 2. Training
 
