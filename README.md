@@ -1,6 +1,6 @@
 # Diffusion Models
 
-A diffusion model repo. Images can be trained `conditionally` or `unconditionally`. 
+A diffusion model repo. Images can be trained `conditionally` and `unconditionally`. 
 
 ### 1. This repo has the folder structure
 
