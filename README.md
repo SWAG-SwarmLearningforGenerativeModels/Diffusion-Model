@@ -16,7 +16,7 @@ project_root/
     │     └── xray/
     ├── runner/
     │     ├── ddpm_conditional.py
-    │     └── conditional.py
+    │     └── ddpm.py
     ├── unet/
     │     ├── __init__.py
     │     └── modules.py
@@ -32,28 +32,29 @@ project_root/
 
 #### 2.1 - Unconditional Training (Default)
 
-1. Navigate to the configs folder, create a config_file.yml file and set training, sampling, data and optimizer parameters accordingly.
-2. In dataloaders.py, create a dataloader for your images within the ```get_data``` function. 
-3. The model.yml file in the configs folder is strictly for the diffusion model parameter which can also be adjusted.
+1. Navigate to the configs folder, you should have a project_config_file.yml file for your project (e.g xray.yml, abdomenCT.yml, etc).
+2. In this project_config_file.yml file, set training, sampling, data and optimizer parameters accordingly.
+2. The model.yml file in the configs folder is strictly for the diffusion model parameter which can also be adjusted.
+3. In dataloaders.py, create a dataloader for your images within the ```get_data``` function.  
 4. In main.py file, you can parse default command-line arguments for the project and loggings. 
-5. Initialize script with ```python main.py --config config_file.yml ---doc project_name```.
+5. Initialize script with ```python main.py --config project_config_file.yml ---doc project_name```.
 6. Project info is logged in ```.../exp/logs/project_name/unconditional/...``` path.
-7. Save model (snapshot_freq parameter is set under ```training``` attribute in the ```config_file.yml file```).
+7. Save model (snapshot_freq parameter is set under ```training``` attribute in the ```project_config_file.yml file```).
 
 #### 2.2 - Conditional Training
 
 1. The --conditonal attribute is set to False by default.
-2. Set ```num_classes``` attribute correctly in ```data``` attribute in the ```config_file.yml file```.
+2. Set ```num_classes``` attribute correctly in ```data``` attribute in the ```project_config_file.yml file```.
 3. Project info is logged in ```.../exp/logs/project_name/conditional/..``` path.
-4. Initialize script with ```python main.py --config config_file.yml ---doc project_name --conditional True```.
+4. Initialize script with ```python main.py --config project_config_file.yml ---doc project_name --conditional True```.
 
 #### 2.3 - Resume Training
-1. Resume training ```python main.py --config config_file.yml ---doc project_name --resume_training True```.
+1. Resume training ```python main.py --config project_config_file.yml ---doc project_name --resume_training True```.
 
 
 ## 3. Sampling
 
-1. To generate samples  ```python main.py --config config_file.yml ---doc project_name --sample True```.
+1. To generate samples  ```python main.py --config project_config_file.yml ---doc project_name --sample True```.
 2. Sampled images are stored in ```.../exp/logs/project_name/(un)conditional/samples``` path.
 
 ### 3.1 - X-Ray (Unconditional)

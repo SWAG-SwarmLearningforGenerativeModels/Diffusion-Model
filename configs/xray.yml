@@ -2,26 +2,21 @@
 device: cuda
 
 training:
-  batch_size: 8
-  n_epochs: 1000
-  snapshot_freq: 5
-  snapshot_sampling: true
-  resume_training: true
+  batch_size: 8            # Batch size during training
+  n_epochs: 100000         # Number of epochs
+  snapshot_freq: 10        # Save models and/or sample images during trainig at every 10 epoch intervals
+  snapshot_sampling: true  # Set true if you want to sample images at snapshot_freq
 
 sampling: 
-  batch_size: 4
-  num_batches: 10
-  data_init: false
+  batch_size: 25           # Batch size of images to be sampled during or after training
 
 data:
-  dataset: xray
-  image_size: 224
-  num_classes: 1
-  train_path: /path/to/images
-  channels: 1
-  rescaled: false
-  random_flip: false
-  num_workers: 4
+  dataset: xray            # Name of dataset, this would check on dataloader
+  image_size: 224          # Image resolution
+  num_classes: 1           # Number of class labels if conditional
+  train_path: path/to/data # Path to dataset
+  channels: 1              # Number of channels
+  num_workers: 4           # Number of workers
 
 optim:
   weight_decay: 0.01
