@@ -11,16 +11,27 @@ sampling:
   batch_size: 25           # Batch size of images to be sampled during or after training
 
 data:
-  dataset: abdomenCT       # Name of dataset, this would check on dataloader
+  dataset: abdomen         # Name of dataset, this would check on dataloader
   image_size: 224          # Image resolution
-  num_classes: 1           # Number of class labels if conditional
+  num_classes: 1           # Set appropriate number of class labels if you want to train conditional model, default is 1 for unconditional
   train_path: path/to/data # Path to dataset
   channels: 1              # Number of channels
   num_workers: 4           # Number of workers
 
+
+model:
+  channel: 128                             # Number of convolution channels
+  channel_multiplier: [1, 1, 2, 2, 4, 4]   # Multipliers on channel for each residual blocks
+  n_res_blocks: 2                          # Number of residual blocks per each channel multiplier
+  attn_strides: [16]                       # Attention (multiples of 2)
+  attn_heads: 1                            # Attention head
+  use_affine_time: false                   # The transformed time is split into two equal parts (gamma and beta). These two parts are then used to perform an affine transformation
+  dropout: 0.0                             # Dropout probability
+  fold: 1                                  # spatial downsampling and upsampling respectively
+
 optim:
   weight_decay: 0.01
-  optimizer: AdamW
+  optimizer: Adam
   lr: 0.0001
   beta1: 0.9
   beta2: 0.999

@@ -28,7 +28,7 @@ def get_data(config):
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Grayscale(1),
             torchvision.transforms.Resize(
-                (config.data.image_size, config.data.image_size)),
+                (config.data.image_size, config.data.image_size), antialias=True),
             torchvision.transforms.Normalize((0.5, ), (0.5, ))
         ])
         train_dataset = torchvision.datasets.ImageFolder(
@@ -49,7 +49,7 @@ def get_data(config):
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Grayscale(1),
             torchvision.transforms.Resize(
-                (config.data.image_size, config.data.image_size)),
+                (config.data.image_size, config.data.image_size), antialias=True),
             torchvision.transforms.Normalize((0.5, ), (0.5, ))
         ])
         train_dataset = torchvision.datasets.ImageFolder(
@@ -77,7 +77,8 @@ def get_data(config):
             def transform(self, img):
                 image_transform = torchvision.transforms.Compose([
                     torchvision.transforms.Grayscale(1),
-                    torchvision.transforms.Resize(self.image_size),
+                    torchvision.transforms.Resize(
+                        (self.image_size, self.image_size), antialias=True),
                     torchvision.transforms.ToTensor(),
                     torchvision.transforms.Normalize(mean=(0.5), std=(0.5))
                 ])

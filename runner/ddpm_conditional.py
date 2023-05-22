@@ -21,10 +21,9 @@ logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s",
 
 
 class ConditionDiffusion:
-    def __init__(self, args, config, model_config, noise_steps=1000, schedule="linear", beta_start=1e-4, beta_end=0.02):
+    def __init__(self, args, config, noise_steps=1000, schedule="linear", beta_start=1e-4, beta_end=0.02):
 
         self.config = config
-        self.model_config = model_config
         self.args = args
         self.device = config.device
 
@@ -131,8 +130,7 @@ class ConditionDiffusion:
 
     def train(self):
         dataloader = get_data(self.config)
-        model = get_model(args=self.args, config=self.config,
-                          model_config=self.model_config)
+        model = get_model(config=self.config)
 
         model.to(self.device)
         print(model.parameters)
@@ -221,8 +219,7 @@ class ConditionDiffusion:
 
     def generate(self):
 
-        model = get_model(args=self.args, config=self.config,
-                          model_config=self.model_config)
+        model = get_model(config=self.config)
 
         model.to(self.device)
 

@@ -23,13 +23,13 @@ def parse_args_and_config():
     parser.add_argument('--seed', type=int, default=1234, help='Random seed')
     parser.add_argument('--exp', type=str, default='exp',
                         help='Path for saving running related data.')
-    parser.add_argument('--doc', type=str, required=True, default='rsna_pe', help='A string for documentation purpose. '
-                        'Will be the name of the log folder.')
-    parser.add_argument('--sample', default=False,
+    parser.add_argument('--doc', type=str, required=True,
+                        default='rsna_pe', help='A string for name of the log folder.')
+    parser.add_argument('--sample', action='store_true',
                         help='Whether to produce samples from the model')
-    parser.add_argument('--conditional', default=False,
+    parser.add_argument('--conditional', action='store_true',
                         help='Whether to train a conditional or unconditional model')
-    parser.add_argument('--resume_training', default=False,
+    parser.add_argument('--resume_training', action='store_true',
                         help='Whether to resume training')
 
     args = parser.parse_args()
@@ -41,12 +41,8 @@ def parse_args_and_config():
     # Data config
     with open(os.path.join('configs', args.config), 'r') as f:
         config = yaml.safe_load(f)
-    # Model Config
-    with open(os.path.join('configs', 'model.yml'), 'r') as f:
-        mod_config = yaml.safe_load(f)
 
     new_config = dict2namespace(config)
-    mode_config = dict2namespace(mod_config)
 
     tb_path = os.path.join(args.exp, 'tensorboard', args.doc)
 
@@ -76,7 +72,7 @@ def parse_args_and_config():
 
     torch.backends.cudnn.benchmark = True
 
-    return args, new_config, mode_config
+    return args, new_config
 
 
 def dict2namespace(config):
@@ -91,7 +87,8 @@ def dict2namespace(config):
 
 
 def main():
-    args, config, model_config = parse_args_and_config()
+    args, config = parse_args_and_config()
+    logging.info("Training conditional model: {}".format(args.conditional))
     logging.info("Writing log file to {}".format(args.log_path))
     logging.info("Exp instance id = {}".format(os.getpid()))
     logging.info("Config =")
@@ -104,11 +101,11 @@ def main():
     if args.sample:
         try:
             if args.conditional:
-                cond_runner = ConditionDiffusion(args, config, model_config)
+                cond_runner = ConditionDiffusion(args, config)
                 cond_runner.generate()
             else:
                 uncond_runner = UnconditionDiffusion(
-                    args, config, model_config)
+                    args, config)
                 uncond_runner.generate()
 
         except:
@@ -118,11 +115,11 @@ def main():
     else:
         try:
             if args.conditional:
-                cond_runner = ConditionDiffusion(args, config, model_config)
+                cond_runner = ConditionDiffusion(args, config)
                 cond_runner.train()
             else:
                 uncond_runner = UnconditionDiffusion(
-                    args, config, model_config)
+                    args, config)
                 uncond_runner.train()
 
         except:
