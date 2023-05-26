@@ -98,8 +98,8 @@ def main():
     print("<" * 100)
 
     print("Initializing Model ... ")
-    if args.sample:
-        try:
+    try:
+        if args.sample:
             if args.conditional:
                 cond_runner = ConditionDiffusion(args, config)
                 cond_runner.generate()
@@ -108,12 +108,7 @@ def main():
                     args, config)
                 uncond_runner.generate()
 
-        except:
-
-            logging.error(traceback.format_exc())
-
-    else:
-        try:
+        else:
             if args.conditional:
                 cond_runner = ConditionDiffusion(args, config)
                 cond_runner.train()
@@ -121,10 +116,8 @@ def main():
                 uncond_runner = UnconditionDiffusion(
                     args, config)
                 uncond_runner.train()
-
-        except:
-
-            logging.error(traceback.format_exc())
+    except:
+        logging.error(traceback.format_exc())
 
     return 0
 
