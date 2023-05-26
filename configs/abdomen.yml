@@ -11,7 +11,7 @@ sampling:
   batch_size: 25           # Batch size of images to be sampled during or after training
 
 data:
-  dataset: abdomen         # Name of dataset, this would check on dataloader
+  dataset: abdomenCT         # Name of dataset, this would check on dataloader
   image_size: 224          # Image resolution
   num_classes: 1           # Set appropriate number of class labels if you want to train conditional model, default is 1 for unconditional
   train_path: path/to/data # Path to dataset

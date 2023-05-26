@@ -1,5 +1,5 @@
 
-device: cpu
+device: cuda
 
 training:
   batch_size: 8            # Batch size during training

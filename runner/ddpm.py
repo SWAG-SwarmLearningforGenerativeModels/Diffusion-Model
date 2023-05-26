@@ -126,6 +126,7 @@ class UnconditionDiffusion:
         model = get_model(config=self.config)
 
         model.to(self.device)
+        model = nn.DataParallel(model)
         print(model.parameters)
 
         ema = EMA(0.995)
