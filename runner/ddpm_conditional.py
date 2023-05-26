@@ -78,7 +78,7 @@ class ConditionDiffusion:
         # noise image and return noised image
         return mean + (var ** 0.5) * eps
 
-    def p_sample(self, eps_model, xt, t, y, eps, cfg_scale=3):
+    def p_sample(self, eps_model, xt, y, t, eps, cfg_scale=3):
         eps_theta = eps_model(xt, t, y)
         if cfg_scale > 0:
             eps_theta2 = eps_model(xt, t, None)
@@ -109,7 +109,7 @@ class ConditionDiffusion:
         # MSE loss
         return self.mse_loss(noise, eps_theta)
 
-    def sample(self, model, n):
+    def sample(self, model, n, y):
         logging.info(f"Sampling {n} new images....")
 
         with torch.no_grad():
@@ -122,7 +122,7 @@ class ConditionDiffusion:
                 else:
                     eps = torch.zeros_like(x, device=x.device)
 
-                x = self.p_sample(eps_model=model, xt=x, t=t, eps=eps)
+                x = self.p_sample(eps_model=model, xt=x, y=y, t=t, eps=eps)
 
         x = inverse_transform(x)
 
@@ -206,11 +206,11 @@ class ConditionDiffusion:
 
                         # Sample images from model
                         sampled_images = self.sample(
-                            model, n=len(labels), labels=labels)
+                            model, n=len(labels), y=labels)
 
                         # Sample images from ema model
                         ema_sampled_images = self.sample(
-                            ema_model, n=len(labels), labels=labels)
+                            ema_model, n=len(labels), y=labels)
 
                         # Save images
                         save_image(sampled_images, os.path.join(
@@ -234,7 +234,7 @@ class ConditionDiffusion:
         for i in range(self.config.sampling.num_batches):
 
             sampled_images = self.sample(
-                model, n=len(labels), labels=labels)
+                model, n=len(labels), y=labels)
 
             save_image(sampled_images, os.path.join(
                 self.args.log_path, 'samples', f"{i}.jpg"), nrow=int(sampled_images.shape[0]**0.5))
