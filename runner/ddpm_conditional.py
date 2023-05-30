@@ -78,9 +78,10 @@ class ConditionDiffusion:
         # noise image and return noised image
         return mean + (var ** 0.5) * eps
 
-    def p_sample(self, eps_model, xt, y, t, eps, cfg_scale=3):
+    def p_sample(self, eps_model, xt, y, t, eps, cfg_scale=0):
         eps_theta = eps_model(xt, t, y)
         if cfg_scale > 0:
+            # set cfg_scale > 0 for CFG
             eps_theta2 = eps_model(xt, t, None)
             eps_theta = torch.lerp(eps_theta2, eps_theta, cfg_scale)
         alpha_hat = gather(self.alpha_hat, t)
@@ -101,7 +102,8 @@ class ConditionDiffusion:
 
         xt = self.q_sample(x0, t, eps=noise)
 
-        if np.random.random() < 0.1:
+        # Set prob for unconditional training incase of CFG
+        if np.random.random() < 0.0:
             y = None
 
         eps_theta = eps_model(xt, t, y)
