@@ -218,7 +218,7 @@ class ConditionDiffusion:
                         save_image(sampled_images, os.path.join(
                             self.args.log_path, 'results', f"{epoch}.jpg"), nrow=self.config.data.num_classes)
                         save_image(ema_sampled_images, os.path.join(
-                            self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=self.config.data_num.classes)
+                            self.args.log_path, 'results', f"{epoch}_ema.jpg"), nrow=self.config.data.num_classes)
 
     def generate(self):
 
