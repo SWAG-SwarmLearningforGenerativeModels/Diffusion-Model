@@ -36,7 +36,7 @@ project_root/
 2. In this project_config_file.yml file, set data, training, sampling, optimizer, and model parameters accordingly.
 3. In dataloaders.py, create a dataloader for your images within the ```get_data``` function.  
 4. In main.py file, you can parse default command-line arguments for the project and loggings. 
-5. Initialize script with ```python main.py --config project_config_file.yml ---doc project_name```.
+5. Initialize script with ```python main.py --config project_config_file.yml --doc project_name```.
 6. Project info is logged in ```.../exp/logs/project_name/unconditional/...``` path.
 7. Save model (snapshot_freq parameter is set under ```training``` attribute in the ```project_config_file.yml file```).
 
@@ -45,15 +45,15 @@ project_root/
 1. The --conditonal attribute is set to False by default.
 2. Set ```num_classes``` attribute correctly in ```data``` attribute in the ```project_config_file.yml file```.
 3. Project info is logged in ```.../exp/logs/project_name/conditional/..``` path.
-4. Initialize script with ```python main.py --config project_config_file.yml ---doc project_name --conditional```.
+4. Initialize script with ```python main.py --config project_config_file.yml --doc project_name --conditional```.
 
 #### 2.3 - Resume Training
-1. Resume training ```python main.py --config project_config_file.yml ---doc project_name --resume_training```.
+1. Resume training ```python main.py --config project_config_file.yml --doc project_name --resume_training```.
 
 
 ## 3. Sampling
 
-1. To generate samples  ```python main.py --config project_config_file.yml ---doc project_name --sample```.
+1. To generate samples  ```python main.py --config project_config_file.yml --doc project_name --sample```.
 2. Sampled images are stored in ```.../exp/logs/project_name/(un)conditional/samples``` path.
 
 ### 3.1 - X-Ray (Unconditional)
