@@ -1,21 +1,12 @@
 import SimpleITK as sitk
-import pandas as pd
 import os
 import torch
 import torchvision
 from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
-import numpy as np
-import pydicom as dicom
-from tqdm import tqdm
 from glob import glob
-import itk
-from scipy import ndimage
 import torchvision.transforms as transforms
-import random
-import gdcm
-import pylibjpeg
 
 
 def get_data(config):

@@ -1,9 +1,7 @@
 import math
-from typing import List
 import torch
 from torch import nn
 from torch.nn import functional as F
-from pydantic import StrictInt, StrictFloat, StrictBool
 
 
 swish = F.silu
