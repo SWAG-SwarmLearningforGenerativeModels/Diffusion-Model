@@ -2,7 +2,18 @@
 
 A diffusion model repo. Images can be trained `conditionally` and `unconditionally`. 
 
-### 1. This repo has the folder structure
+
+## 1. Setup
+
+### 1.1. Dependencies
+
+Run the following to install all necessary python packages for our code.
+
+```bash
+pip install -r requirements.txt
+```
+
+### 1.2. This repo has the folder structure
 
 <pre>
 ```
