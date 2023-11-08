@@ -4,7 +4,7 @@ device: cuda
 training:
   batch_size: 8            # Batch size during training
   n_epochs: 100000         # Number of epochs
-  snapshot_freq: 10        # Save models and/or sample images during trainig at every 10 epoch intervals
+  snapshot_freq: 1        # Save models and/or sample images during trainig at every 10 epoch intervals
   snapshot_sampling: true  # Set true if you want to sample images at snapshot_freq
 
 sampling: 
@@ -14,7 +14,7 @@ data:
   dataset: xray            # Name of dataset, this would check on dataloader
   image_size: 224          # Image resolution
   num_classes: 2           # Set appropriate number of class labels if you want to train conditional model, default is 1 for unconditional
-  train_path: /home/domainHomes/aokolie/Desktop/Augustine Workspace/SWAG PROJECT/datasets/X-Rays/datasets/CXR14/CXR14/files/images_009 # Path to dataset
+  train_path: /home/patrick/SWAG/data/CXR14/images_010 # Path to dataset
   channels: 1              # Number of channels
   num_workers: 4           # Number of workers
 
